@@ -1,19 +1,19 @@
-"""Firestore REST data access for the VENTE Android application."""
+"""Read-only Firebase data access for the VENTE Android application."""
 
+import hashlib
 import json
-import threading
+import os
+import ssl
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, quote
+from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
+
+import certifi
 
 
 _FIREBASE_CONFIG = None
-_TOKEN_LOCK = threading.RLock()
-_ID_TOKEN = None
-_REFRESH_TOKEN = None
-_TOKEN_EXPIRY = 0
 _REQUEST_TIMEOUT = 20
 
 _COLLECTIONS = {
@@ -23,11 +23,7 @@ _COLLECTIONS = {
 
 
 class FirebaseError(RuntimeError):
-    """Raised when Firebase configuration, authentication, or a request fails."""
-
-
-class AuthenticationRequiredError(FirebaseError):
-    """Raised when an administrator token is required but not available."""
+    """Raised when Firebase configuration or a request fails."""
 
 
 def _firebase_config():
@@ -60,11 +56,6 @@ def _firebase_config():
     return _FIREBASE_CONFIG
 
 
-def creer_base():
-    """Keep the legacy entry point; validate Firebase config without touching SQLite."""
-    _firebase_config()
-
-
 def _decode_response(response):
     if not response:
         return {}
@@ -74,24 +65,17 @@ def _decode_response(response):
         raise FirebaseError("Firebase a renvoyé une réponse illisible.") from error
 
 
-def _request_json(url, method="GET", payload=None, headers=None):
-    request_headers = {"Accept": "application/json"}
-    if payload is not None:
-        request_headers["Content-Type"] = "application/json"
-    if headers:
-        request_headers.update(headers)
+def _ssl_context():
+    return ssl.create_default_context(cafile=certifi.where())
 
-    content_type = request_headers.get("Content-Type", "")
-    if payload is None:
-        body = None
-    elif content_type == "application/x-www-form-urlencoded":
-        body = urlencode(payload).encode("utf-8")
-    else:
-        body = json.dumps(payload).encode("utf-8")
-    request = Request(url, data=body, headers=request_headers, method=method)
+
+def _request_json(url):
+    request = Request(url, headers={"Accept": "application/json"}, method="GET")
 
     try:
-        with urlopen(request, timeout=_REQUEST_TIMEOUT) as response:
+        with urlopen(
+            request, timeout=_REQUEST_TIMEOUT, context=_ssl_context()
+        ) as response:
             return _decode_response(response.read())
     except HTTPError as error:
         response_data = _decode_response(error.read())
@@ -107,134 +91,13 @@ def _request_json(url, method="GET", payload=None, headers=None):
         ) from error
 
 
-def authentifier_administrateur(email, mot_de_passe):
-    """Sign in without persisting credentials; the returned tokens stay in memory."""
-    global _ID_TOKEN, _REFRESH_TOKEN, _TOKEN_EXPIRY
-
+def _firestore_collection_url(collection):
     config = _firebase_config()
-    url = (
-        "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?"
-        + urlencode({"key": config["api_key"]})
-    )
-    response = _request_json(
-        url,
-        method="POST",
-        payload={
-            "email": email,
-            "password": mot_de_passe,
-            "returnSecureToken": True,
-        },
-    )
-    try:
-        id_token = response["idToken"]
-        refresh_token = response["refreshToken"]
-        expires_in = int(response["expiresIn"])
-    except (KeyError, TypeError, ValueError) as error:
-        raise FirebaseError(
-            "Firebase Authentication n'a pas fourni de jeton valide."
-        ) from error
-
-    with _TOKEN_LOCK:
-        _ID_TOKEN = id_token
-        _REFRESH_TOKEN = refresh_token
-        _TOKEN_EXPIRY = datetime.now(timezone.utc).timestamp() + expires_in
-
-
-def administrateur_connecte():
-    with _TOKEN_LOCK:
-        return _ID_TOKEN is not None
-
-
-def _refresh_id_token():
-    global _ID_TOKEN, _REFRESH_TOKEN, _TOKEN_EXPIRY
-
-    with _TOKEN_LOCK:
-        refresh_token = _REFRESH_TOKEN
-    if refresh_token is None:
-        raise AuthenticationRequiredError(
-            "Connectez-vous avec un compte administrateur Firebase pour modifier les données."
-        )
-
-    config = _firebase_config()
-    url = (
-        "https://securetoken.googleapis.com/v1/token?"
-        + urlencode({"key": config["api_key"]})
-    )
-    response = _request_json(
-        url,
-        method="POST",
-        payload={
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-        },
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    try:
-        id_token = response["id_token"]
-        new_refresh_token = response["refresh_token"]
-        expires_in = int(response["expires_in"])
-    except (KeyError, TypeError, ValueError) as error:
-        raise FirebaseError(
-            "Firebase Authentication n'a pas renouvelé le jeton."
-        ) from error
-
-    with _TOKEN_LOCK:
-        _ID_TOKEN = id_token
-        _REFRESH_TOKEN = new_refresh_token
-        _TOKEN_EXPIRY = datetime.now(timezone.utc).timestamp() + expires_in
-
-
-def _firestore_request(url, method="GET", payload=None, require_admin=False):
-    headers = {}
-    if require_admin:
-        with _TOKEN_LOCK:
-            token = _ID_TOKEN
-            token_expiry = _TOKEN_EXPIRY
-        if token is None:
-            raise AuthenticationRequiredError(
-                "Connectez-vous avec un compte administrateur Firebase pour modifier les données."
-            )
-        if token_expiry <= datetime.now(timezone.utc).timestamp() + 60:
-            _refresh_id_token()
-            with _TOKEN_LOCK:
-                token = _ID_TOKEN
-        headers["Authorization"] = "Bearer {}".format(token)
-
-    try:
-        return _request_json(url, method=method, payload=payload, headers=headers)
-    except FirebaseError as error:
-        if not require_admin or "Firebase :" not in str(error):
-            raise
-        if "INVALID_ID_TOKEN" not in str(error) and "UNAUTHENTICATED" not in str(error):
-            raise
-        _refresh_id_token()
-        with _TOKEN_LOCK:
-            refreshed_token = _ID_TOKEN
-        return _request_json(
-            url,
-            method=method,
-            payload=payload,
-            headers={"Authorization": "Bearer {}".format(refreshed_token)},
-        )
-
-
-def _firestore_collection_url(collection, document_id=None):
-    config = _firebase_config()
-    project_id = config["project_id"]
     url = (
         "https://firestore.googleapis.com/v1/projects/{}/databases/(default)"
-        "/documents/{}".format(project_id, collection)
+        "/documents/{}".format(config["project_id"], collection)
     )
-    if document_id is not None:
-        url += "/" + quote(str(document_id), safe="")
     return "{}?{}".format(url, urlencode({"key": config["api_key"]}))
-
-
-def _firestore_fields(values):
-    return {
-        key: {"stringValue": "" if value is None else str(value)}
-        for key, value in values.items()
-    }
 
 
 def _decode_fields(fields, field_names):
@@ -252,9 +115,7 @@ def _list_documents(collection):
     query = {"pageSize": 1000}
 
     while True:
-        response = _firestore_request(
-            "{}&{}".format(url, urlencode(query))
-        )
+        response = _request_json("{}&{}".format(url, urlencode(query)))
         documents.extend(response.get("documents", []))
         page_token = response.get("nextPageToken")
         if not page_token:
@@ -297,34 +158,14 @@ def _timestamp_sort_value(document):
 def obtenir_produits():
     documents = _list_documents("produits")
     return [
-        (_document_id(document), *_decode_fields(
-            document.get("fields", {}), _COLLECTIONS["produits"]
-        ))
+        (
+            _document_id(document),
+            *_decode_fields(
+                document.get("fields", {}), _COLLECTIONS["produits"]
+            ),
+        )
         for document in documents
     ]
-
-
-def ajouter_produit(nom, prix, description, image):
-    values = dict(zip(_COLLECTIONS["produits"], (nom, prix, description, image)))
-    document = _firestore_request(
-        _firestore_collection_url("produits"),
-        method="POST",
-        payload={"fields": _firestore_fields(values)},
-        require_admin=True,
-    )
-    return _document_id(document)
-
-
-def modifier_produit(id_produit, nom, prix, description, image):
-    _modifier_document(
-        "produits",
-        id_produit,
-        dict(zip(_COLLECTIONS["produits"], (nom, prix, description, image))),
-    )
-
-
-def supprimer_produit(id_produit):
-    _supprimer_document("produits", id_produit)
 
 
 def obtenir_publications():
@@ -337,67 +178,83 @@ def obtenir_publications():
         reverse=True,
     )
     return [
-        (_document_id(document), *_decode_fields(
-            document.get("fields", {}), _COLLECTIONS["publications"]
-        ))
+        (
+            _document_id(document),
+            *_decode_fields(
+                document.get("fields", {}), _COLLECTIONS["publications"]
+            ),
+        )
         for document in documents
     ]
 
 
-def ajouter_publication(titre, contenu, date, image):
-    values = dict(zip(
-        _COLLECTIONS["publications"], (titre, contenu, date, image)
-    ))
-    fields = _firestore_fields(values)
-    fields["_createdAt"] = {
-        "timestampValue": datetime.now(timezone.utc).isoformat().replace(
-            "+00:00", "Z"
-        )
-    }
-    document = _firestore_request(
-        _firestore_collection_url("publications"),
-        method="POST",
-        payload={"fields": fields},
-        require_admin=True,
-    )
-    return _document_id(document)
+def image_locale(image_reference, cache_directory):
+    """Resolve bundled legacy images or download Firebase Storage images safely."""
+    if not image_reference:
+        return ""
 
+    parsed = urlparse(str(image_reference))
+    if parsed.scheme not in ("http", "https"):
+        image_path = Path(__file__).resolve().parent / str(image_reference)
+        return str(image_path) if image_path.is_file() else ""
 
-def modifier_publication(id_publication, titre, contenu, date, image):
-    _modifier_document(
-        "publications",
-        id_publication,
-        dict(zip(
-            _COLLECTIONS["publications"], (titre, contenu, date, image)
-        )),
-    )
+    if parsed.scheme != "https":
+        raise FirebaseError("Les images distantes doivent utiliser HTTPS.")
 
+    extension = Path(parsed.path).suffix.lower()
+    if extension not in (".jpg", ".jpeg", ".png", ".webp"):
+        extension = ""
+    cache_name = hashlib.sha256(image_reference.encode("utf-8")).hexdigest()
+    cache_folder = Path(cache_directory) / "images"
+    if extension:
+        cache_path = cache_folder / (cache_name + extension)
+    else:
+        cache_path = None
+    if cache_path is not None and cache_path.is_file():
+        return str(cache_path)
 
-def supprimer_publication(id_publication):
-    _supprimer_document("publications", id_publication)
+    request = Request(image_reference, headers={"Accept": "image/*"})
+    try:
+        with urlopen(
+            request, timeout=_REQUEST_TIMEOUT, context=_ssl_context()
+        ) as response:
+            content_type = response.headers.get_content_type()
+            extensions_by_type = {
+                "image/jpeg": ".jpg",
+                "image/png": ".png",
+                "image/webp": ".webp",
+            }
+            response_extension = extensions_by_type.get(content_type)
+            if response_extension is None:
+                raise FirebaseError(
+                    "Firebase Storage a renvoyé un type d'image non pris en charge."
+                )
+            cache_path = cache_folder / (cache_name + response_extension)
+            if cache_path.is_file():
+                return str(cache_path)
+            content = response.read(5 * 1024 * 1024 + 1)
+            if len(content) > 5 * 1024 * 1024:
+                raise FirebaseError("L'image dépasse la taille maximale autorisée.")
+    except HTTPError as error:
+        raise FirebaseError(
+            "Téléchargement de l'image impossible (HTTP {}).".format(error.code)
+        ) from error
+    except (URLError, TimeoutError, OSError) as error:
+        raise FirebaseError(
+            "Téléchargement de l'image impossible : {}".format(error)
+        ) from error
 
-
-def _modifier_document(collection, document_id, values):
-    if document_id is None or not str(document_id):
-        raise ValueError("L'identifiant Firestore ne peut pas être vide.")
-    query = urlencode(
-        [("updateMask.fieldPaths", field_name) for field_name in values]
-    )
-    _firestore_request(
-        "{}&{}".format(
-            _firestore_collection_url(collection, document_id), query
-        ),
-        method="PATCH",
-        payload={"fields": _firestore_fields(values)},
-        require_admin=True,
-    )
-
-
-def _supprimer_document(collection, document_id):
-    if document_id is None or not str(document_id):
-        raise ValueError("L'identifiant Firestore ne peut pas être vide.")
-    _firestore_request(
-        _firestore_collection_url(collection, document_id),
-        method="DELETE",
-        require_admin=True,
-    )
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = cache_path.with_suffix(cache_path.suffix + ".tmp")
+    try:
+        temporary_path.write_bytes(content)
+        os.replace(str(temporary_path), str(cache_path))
+    except OSError as error:
+        try:
+            temporary_path.unlink()
+        except FileNotFoundError:
+            pass
+        raise FirebaseError(
+            "Impossible d'enregistrer l'image dans le cache : {}".format(error)
+        ) from error
+    return str(cache_path)

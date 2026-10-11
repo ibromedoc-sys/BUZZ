@@ -1,0 +1,340 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  getIdTokenResult,
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getFirestore,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {
+  getDownloadURL,
+  getStorage,
+  ref,
+  uploadBytes,
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
+import { firebaseConfig } from "./firebase-config.js";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+const $ = (selector) => document.querySelector(selector);
+
+const notice = $("#notice");
+const loginPanel = $("#login-panel");
+const dashboard = $("#dashboard");
+const signOutButton = $("#sign-out");
+const productForm = $("#product-form");
+const publicationForm = $("#publication-form");
+const records = { produits: [], publications: [] };
+let unsubscribeProducts;
+let unsubscribePublications;
+let noticeTimeout;
+
+function showNotice(message, kind = "error") {
+  notice.textContent = message;
+  notice.className = `notice ${kind}`;
+  window.clearTimeout(noticeTimeout);
+  noticeTimeout = window.setTimeout(() => notice.classList.add("hidden"), 7000);
+}
+
+function friendlyError(error) {
+  const messages = {
+    "auth/invalid-credential": "Adresse e-mail ou mot de passe incorrect.",
+    "auth/too-many-requests": "Trop de tentatives. Réessayez plus tard.",
+    "permission-denied": "Accès refusé par les règles Firebase.",
+    "storage/unauthorized": "Téléversement refusé par les règles Storage.",
+    "storage/canceled": "Téléversement annulé.",
+  };
+  return messages[error.code] || error.message || "Une erreur inattendue est survenue.";
+}
+
+function setSignedIn(visible) {
+  loginPanel.classList.toggle("hidden", visible);
+  dashboard.classList.toggle("hidden", !visible);
+  signOutButton.classList.toggle("hidden", !visible);
+}
+
+function stopListeners() {
+  if (unsubscribeProducts) unsubscribeProducts();
+  if (unsubscribePublications) unsubscribePublications();
+  unsubscribeProducts = undefined;
+  unsubscribePublications = undefined;
+}
+
+function watchRecords() {
+  stopListeners();
+  unsubscribeProducts = onSnapshot(
+    collection(db, "produits"),
+    (snapshot) => {
+      records.produits = snapshot.docs.map((item) => ({
+        id: item.id,
+        ...item.data(),
+      }));
+      renderRecords("produits");
+    },
+    (error) => showNotice(friendlyError(error)),
+  );
+  unsubscribePublications = onSnapshot(
+    collection(db, "publications"),
+    (snapshot) => {
+      records.publications = snapshot.docs.map((item) => ({
+        id: item.id,
+        ...item.data(),
+      }));
+      renderRecords("publications");
+    },
+    (error) => showNotice(friendlyError(error)),
+  );
+}
+
+function escapeHtml(value = "") {
+  return String(value).replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]);
+}
+
+function recordTitle(type, item) {
+  return type === "produits" ? item.nom || "Produit sans nom" :
+    item.titre || "Publication sans titre";
+}
+
+function imagePreviewUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function renderRecords(type) {
+  const isProduct = type === "produits";
+  const list = isProduct ? $("#product-list") : $("#publication-list");
+  const count = isProduct ? $("#product-count") : $("#publication-count");
+  const sorted = [...records[type]].sort((left, right) => {
+    const leftDate = left._createdAt?.toMillis?.() || Date.parse(left.date) || 0;
+    const rightDate = right._createdAt?.toMillis?.() || Date.parse(right.date) || 0;
+    return rightDate - leftDate;
+  });
+  count.textContent = String(sorted.length);
+  list.replaceChildren();
+
+  if (!sorted.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "Aucun élément pour le moment.";
+    list.append(empty);
+    return;
+  }
+
+  for (const item of sorted) {
+    const row = document.createElement("article");
+    row.className = "record";
+    const secondary = isProduct ? item.prix || "" : item.date || "";
+    const imageUrl = imagePreviewUrl(item.image || "");
+    row.innerHTML = `
+      ${imageUrl ? `<img class="record-image" src="${escapeHtml(imageUrl)}" alt="">` :
+        '<span class="record-placeholder" aria-hidden="true"></span>'}
+      <div class="record-copy">
+        <strong>${escapeHtml(recordTitle(type, item))}</strong>
+        <span>${escapeHtml(secondary)}</span>
+      </div>
+      <div class="record-actions">
+        <button class="icon-button" type="button" data-action="edit"
+                data-type="${type}" data-id="${escapeHtml(item.id)}"
+                aria-label="Modifier ${escapeHtml(recordTitle(type, item))}">
+          Modifier
+        </button>
+        <button class="icon-button danger" type="button" data-action="delete"
+                data-type="${type}" data-id="${escapeHtml(item.id)}"
+                aria-label="Supprimer ${escapeHtml(recordTitle(type, item))}">
+          Supprimer
+        </button>
+      </div>`;
+    list.append(row);
+  }
+}
+
+async function uploadImage(type, recordId, file) {
+  if (!file) return "";
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error("Choisissez une image JPEG, PNG ou WebP.");
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("L'image dépasse la taille maximale de 5 Mo.");
+  }
+  const imageRef = ref(storage, `${type}/${recordId}/${crypto.randomUUID()}`);
+  await uploadBytes(imageRef, file, { contentType: file.type });
+  return getDownloadURL(imageRef);
+}
+
+function recordIdFor(form) {
+  return form.elements.id.value || crypto.randomUUID();
+}
+
+async function saveRecord(type, form, event) {
+  event.preventDefault();
+  const isProduct = type === "produits";
+  const formData = new FormData(form);
+  const existingId = form.elements.id.value;
+  const recordId = recordIdFor(form);
+  const file = form.elements.image.files[0];
+  const oldRecord = records[type].find((item) => item.id === existingId);
+
+  try {
+    const values = isProduct
+      ? {
+          nom: String(formData.get("nom")).trim(),
+          prix: String(formData.get("prix")).trim(),
+          description: String(formData.get("description")).trim(),
+        }
+      : {
+          titre: String(formData.get("titre")).trim(),
+          contenu: String(formData.get("contenu")).trim(),
+          date: String(formData.get("date")) || new Date().toISOString().slice(0, 10),
+        };
+    if (!values[isProduct ? "nom" : "titre"]) {
+      throw new Error(isProduct ? "Le nom est obligatoire." : "Le titre est obligatoire.");
+    }
+    values.image = file
+      ? await uploadImage(type, recordId, file)
+      : oldRecord?.image || "";
+
+    const collectionRef = collection(db, type);
+    if (existingId) {
+      await updateDoc(doc(collectionRef, existingId), values);
+      showNotice("Modifications enregistrées.", "success");
+    } else {
+      if (type === "publications") values._createdAt = serverTimestamp();
+      await setDoc(doc(collectionRef, recordId), values);
+      showNotice("Élément ajouté.", "success");
+    }
+    resetForm(form);
+  } catch (error) {
+    showNotice(friendlyError(error));
+  }
+}
+
+function resetForm(form) {
+  form.reset();
+  form.elements.id.value = "";
+  $(`#${form.id}-title`).textContent = form === productForm
+    ? "Ajouter un produit" : "Ajouter une publication";
+  form.querySelector('[data-cancel]')?.classList.add("hidden");
+}
+
+function editRecord(type, id) {
+  const item = records[type].find((record) => record.id === id);
+  if (!item) {
+    showNotice("Cet élément n'est plus disponible.");
+    return;
+  }
+  const form = type === "produits" ? productForm : publicationForm;
+  form.elements.id.value = item.id;
+  if (type === "produits") {
+    form.elements.nom.value = item.nom || "";
+    form.elements.prix.value = item.prix || "";
+    form.elements.description.value = item.description || "";
+    $("#product-form-title").textContent = "Modifier le produit";
+  } else {
+    form.elements.titre.value = item.titre || "";
+    form.elements.contenu.value = item.contenu || "";
+    form.elements.date.value = item.date || "";
+    $("#publication-form-title").textContent = "Modifier la publication";
+  }
+  form.querySelector('[data-cancel]').classList.remove("hidden");
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function deleteRecord(type, id) {
+  const item = records[type].find((record) => record.id === id);
+  if (!item || !window.confirm(`Supprimer « ${recordTitle(type, item)} » ?`)) return;
+  try {
+    await deleteDoc(doc(db, type, id));
+    showNotice("Élément supprimé.", "success");
+  } catch (error) {
+    showNotice(friendlyError(error));
+  }
+}
+
+$("#login-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    await signInWithEmailAndPassword(
+      auth,
+      form.elements.email.value.trim(),
+      form.elements.password.value,
+    );
+  } catch (error) {
+    showNotice(friendlyError(error));
+  }
+});
+
+signOutButton.addEventListener("click", async () => {
+  try {
+    stopListeners();
+    await signOut(auth);
+  } catch (error) {
+    showNotice(friendlyError(error));
+  }
+});
+
+productForm.addEventListener("submit", (event) => saveRecord("produits", productForm, event));
+publicationForm.addEventListener("submit", (event) =>
+  saveRecord("publications", publicationForm, event));
+
+document.addEventListener("click", async (event) => {
+  const target = event.target.closest("[data-action], [data-cancel], .tab");
+  if (!target) return;
+  if (target.matches(".tab")) {
+    document.querySelectorAll(".tab").forEach((tab) =>
+      tab.classList.toggle("active", tab === target));
+    document.querySelectorAll(".management-panel").forEach((panel) =>
+      panel.classList.toggle("hidden", panel.id !== target.dataset.panel));
+  } else if (target.dataset.cancel) {
+    resetForm(target.dataset.cancel === "product" ? productForm : publicationForm);
+  } else if (target.dataset.action === "edit") {
+    editRecord(target.dataset.type, target.dataset.id);
+  } else if (target.dataset.action === "delete") {
+    await deleteRecord(target.dataset.type, target.dataset.id);
+  }
+});
+
+onAuthStateChanged(auth, async (user) => {
+  stopListeners();
+  if (!user) {
+    setSignedIn(false);
+    $("#admin-email").textContent = "";
+    return;
+  }
+  try {
+    const token = await getIdTokenResult(user, true);
+    if (token.claims.admin !== true) {
+      await signOut(auth);
+      showNotice("Ce compte n'a pas la revendication administrateur requise.");
+      return;
+    }
+    $("#admin-email").textContent = user.email || "";
+    setSignedIn(true);
+    watchRecords();
+  } catch (error) {
+    showNotice(friendlyError(error));
+  }
+});

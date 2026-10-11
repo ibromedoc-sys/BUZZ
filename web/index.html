@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#102820">
+    <title>VENTE — Administration</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="VENTE administration">
+          <span class="brand-mark">V</span>
+          <span>VENTE <small>ADMINISTRATION</small></span>
+        </a>
+        <button id="sign-out" class="button button-quiet hidden" type="button">
+          Se déconnecter
+        </button>
+      </header>
+
+      <section id="notice" class="notice hidden" role="status"></section>
+
+      <section id="login-panel" class="login-panel">
+        <p class="eyebrow">ESPACE SÉCURISÉ</p>
+        <h1>Connexion administrateur</h1>
+        <p class="muted">Connectez-vous avec votre compte Firebase autorisé.</p>
+        <form id="login-form" class="form-stack">
+          <label for="email">Adresse e-mail</label>
+          <input id="email" name="email" type="email" autocomplete="username"
+                 required>
+          <label for="password">Mot de passe</label>
+          <input id="password" name="password" type="password"
+                 autocomplete="current-password" required>
+          <button class="button button-primary" type="submit">Se connecter</button>
+        </form>
+      </section>
+
+      <section id="dashboard" class="hidden">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">TABLEAU DE BORD</p>
+            <h1>Gérer le catalogue</h1>
+          </div>
+          <span id="admin-email" class="admin-email"></span>
+        </div>
+
+        <nav class="tabs" aria-label="Sections d'administration">
+          <button class="tab active" type="button" data-panel="products-panel">
+            Produits
+          </button>
+          <button class="tab" type="button" data-panel="publications-panel">
+            Publications
+          </button>
+        </nav>
+
+        <section id="products-panel" class="management-panel">
+          <div class="section-grid">
+            <form id="product-form" class="editor-card">
+              <div class="card-heading">
+                <div>
+                  <p class="eyebrow">CATALOGUE</p>
+                  <h2 id="product-form-title">Ajouter un produit</h2>
+                </div>
+              </div>
+              <input name="id" type="hidden">
+              <label for="product-name">Nom</label>
+              <input id="product-name" name="nom" maxlength="120" required>
+              <label for="product-price">Prix</label>
+              <input id="product-price" name="prix" maxlength="60" required>
+              <label for="product-description">Description</label>
+              <textarea id="product-description" name="description"
+                        rows="4" maxlength="2000"></textarea>
+              <label for="product-image">Image</label>
+              <input id="product-image" name="image" type="file"
+                     accept="image/jpeg,image/png,image/webp">
+              <p class="field-help">JPEG, PNG ou WebP — 5 Mo maximum.</p>
+              <div class="form-actions">
+                <button class="button button-primary" type="submit">
+                  Enregistrer le produit
+                </button>
+                <button class="button button-quiet hidden" type="button"
+                        data-cancel="product">Annuler</button>
+              </div>
+            </form>
+            <section class="list-card">
+              <div class="card-heading">
+                <div>
+                  <p class="eyebrow">FIRESTORE</p>
+                  <h2>Produits existants</h2>
+                </div>
+                <span id="product-count" class="count-badge">0</span>
+              </div>
+              <div id="product-list" class="record-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="publications-panel" class="management-panel hidden">
+          <div class="section-grid">
+            <form id="publication-form" class="editor-card">
+              <div class="card-heading">
+                <div>
+                  <p class="eyebrow">ACTUALITÉS</p>
+                  <h2 id="publication-form-title">Ajouter une publication</h2>
+                </div>
+              </div>
+              <input name="id" type="hidden">
+              <label for="publication-title">Titre</label>
+              <input id="publication-title" name="titre" maxlength="160"
+                     required>
+              <label for="publication-content">Contenu</label>
+              <textarea id="publication-content" name="contenu" rows="5"
+                        maxlength="5000"></textarea>
+              <label for="publication-date">Date</label>
+              <input id="publication-date" name="date" type="text"
+                     inputmode="numeric" placeholder="AAAA-MM-JJ">
+              <label for="publication-image">Image</label>
+              <input id="publication-image" name="image" type="file"
+                     accept="image/jpeg,image/png,image/webp">
+              <p class="field-help">JPEG, PNG ou WebP — 5 Mo maximum.</p>
+              <div class="form-actions">
+                <button class="button button-primary" type="submit">
+                  Enregistrer la publication
+                </button>
+                <button class="button button-quiet hidden" type="button"
+                        data-cancel="publication">Annuler</button>
+              </div>
+            </form>
+            <section class="list-card">
+              <div class="card-heading">
+                <div>
+                  <p class="eyebrow">FIRESTORE</p>
+                  <h2>Publications existantes</h2>
+                </div>
+                <span id="publication-count" class="count-badge">0</span>
+              </div>
+              <div id="publication-list" class="record-list"></div>
+            </section>
+          </div>
+        </section>
+      </section>
+      <footer>VENTE · Administration protégée par Firebase Authentication</footer>
+    </main>
+  </body>
+</html>
