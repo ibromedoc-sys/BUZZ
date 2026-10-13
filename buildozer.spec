@@ -9,6 +9,7 @@ source.include_exts = py,png,jpg,jpeg,webp,kv,atlas,json
 source.exclude_dirs = .git, .buildozer, bin, venv, __pycache__, vendor, web
 
 version = 0.1
+android.numeric_version = 1
 
 requirements = python3,kivy==2.3.0,kivymd==2.0.0,materialyoucolor==3.0.3,materialshapes,asynckivy,asyncgui,pyjnius,certifi
 
@@ -21,7 +22,7 @@ android.minapi = 24
 android.ndk_api = 24
 android.archs = arm64-v8a
 
-android.permissions = INTERNET,POST_NOTIFICATIONS
+android.permissions = INTERNET,POST_NOTIFICATIONS,REQUEST_INSTALL_PACKAGES
 android.enable_androidx = True
 android.gradle_dependencies = com.google.firebase:firebase-messaging:24.1.2
 android.add_src = %(source.dir)s/android_src

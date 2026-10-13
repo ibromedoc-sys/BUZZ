@@ -26,6 +26,32 @@ firebase deploy --only hosting
 Héberger le tableau de bord en HTTPS via Firebase Hosting. Ne pas l'ouvrir
 directement depuis `file://` : les modules Firebase exigent un serveur Web.
 
+## Publier une mise à jour Android
+
+L'application vérifie `https://vente-24ed2.web.app/app-update.json` au démarrage.
+Le manifeste versionné dans `web/app-update.json` doit contenir un `version_code`
+entier supérieur à celui de l'application installée, un `version_name`, l'URL
+HTTPS de l'APK et son empreinte SHA-256. Le lien APK doit rester sur le domaine
+Firebase Hosting `vente-24ed2.web.app`.
+
+Pour chaque nouvelle version :
+
+1. Incrémenter `android.numeric_version` dans `buildozer.spec` et modifier
+   `version` si nécessaire, puis générer l'APK.
+2. Copier l'APK dans `web/downloads/vente-<version>.apk`.
+3. Calculer son empreinte dans PowerShell (en adaptant le nom de fichier), par
+   exemple `(Get-FileHash .\web\downloads\vente-0.2.apk -Algorithm SHA256).Hash`.
+4. Mettre à jour `web/app-update.json` avec le nouveau code et nom de version,
+   `"/downloads/vente-<version>.apk"` et l'empreinte obtenue en minuscules.
+5. Déployer Firebase Hosting avec `firebase deploy --only hosting`.
+
+Au prochain démarrage connecté, l'application proposera le téléchargement.
+Elle vérifie l'empreinte avant de lancer l'installateur Android. Android peut
+demander à l'utilisateur d'autoriser l'installation depuis VENTE, puis une
+confirmation explicite de l'installation. Les APK sous `web/downloads/` sont
+ignorées par Git (`*.apk`) mais sont publiées par Firebase Hosting lors du
+déploiement local.
+
 Les lectures des collections `produits` et `publications` sont publiques pour
 les appareils clients. Seuls les jetons portant `admin: true` peuvent écrire
 dans Firestore. Le compte admin doit se déconnecter puis se reconnecter (ou
