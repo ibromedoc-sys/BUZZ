@@ -1,10 +1,12 @@
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from urllib.parse import quote
 
+from kivy.animation import Animation
 from kivy.clock import Clock
 from kivy.lang import Builder
-from kivy.properties import StringProperty
+from kivy.properties import BooleanProperty, NumericProperty, StringProperty
 from kivymd.app import MDApp
 from kivymd.uix.navigationbar import (
     MDNavigationBar,
@@ -16,6 +18,7 @@ from kivymd.uix.navigationbar import (
 from database import FirebaseError, obtenir_produits, obtenir_publications, image_locale
 
 from kivy.uix.popup import Popup
+from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label as KivyLabel
 
 try:
@@ -30,7 +33,21 @@ class BaseNavigationItem(MDNavigationItem):
     screen_name = StringProperty()
 
 
+class AnimatedLogo(BoxLayout):
+    scale = NumericProperty(1)
+
+
 KV = """
+<AnimatedLogo>:
+    canvas.before:
+        PushMatrix
+        Scale:
+            x: self.scale
+            y: self.scale
+            origin: self.center
+    canvas.after:
+        PopMatrix
+
 <BaseNavigationItem>:
     MDNavigationItemIcon:
         icon: root.icon
@@ -57,15 +74,55 @@ MDScreen:
                     orientation: "vertical"
                     padding: "30dp"
                     spacing: "20dp"
+                    canvas.before:
+                        Color:
+                            rgba: 0.08, 0.12, 0.18, 1
+                        Rectangle:
+                            pos: self.pos
+                            size: self.size
                     MDLabel:
-                        text: "Bienvenue !"
+                        text: "Bienvenue Chez SUPERLIFE TOGO!"
                         halign: "center"
                         font_size: "30sp"
                         bold: True
+                        color: 1, 1, 1, 1
+                        size_hint_y: None
+                        height: "55dp"
+                    AnimatedLogo:
+                        id: home_logo
+                        orientation: "vertical"
+                        size_hint_y: None
+                        height: "170dp"
+                        spacing: "5dp"
+                        MDIcon:
+                            id: logo_icon
+                            icon: "storefront"
+                            font_size: "92sp"
+                            theme_text_color: "Custom"
+                            text_color: 1, 1, 1, 1
+                            opacity: 0 if app.logo_available else 1
+                        Image:
+                            id: logo_image
+                            source: app.logo_image
+                            opacity: 1 if app.logo_available else 0
+                            fit_mode: "contain"
+                            size_hint: 1, 1
+                            size_hint_y: None
+                            height: "120dp"
+                        MDLabel:
+                            text: "VENTE"
+                            halign: "center"
+                            font_size: "22sp"
+                            bold: True
+                            color: 1, 1, 1, 1
+                            opacity: 0 if app.logo_available else 1
                     MDLabel:
-                        text: "Découvrez nos produits et nos informations."
+                        text: "Découvrez nos produits et nos infos en exclusivités dans le domaine de l'entrepreneuriat."
                         halign: "center"
                         font_size: "18sp"
+                        color: 1, 1, 1, 1
+                        size_hint_y: None
+                        height: "60dp"
 
             MDScreen:
                 name: "produits"
@@ -110,15 +167,44 @@ MDScreen:
                     orientation: "vertical"
                     padding: "30dp"
                     spacing: "20dp"
+                    canvas.before:
+                        Color:
+                            rgba: 0.08, 0.12, 0.18, 1
+                        Rectangle:
+                            pos: self.pos
+                            size: self.size
                     MDLabel:
                         text: "À PROPOS"
                         halign: "center"
                         font_size: "30sp"
                         bold: True
+                        color: 1, 1, 1, 1
+                        size_hint_y: None
+                        height: "55dp"
+                    FloatLayout:
+                        size_hint_y: None
+                        height: "240dp"
+                        MDIcon:
+                            icon: "account-circle"
+                            font_size: "150sp"
+                            theme_text_color: "Custom"
+                            text_color: 0.75, 0.8, 0.88, 1
+                            opacity: 0 if app.owner_photo_available else 1
+                            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                        Image:
+                            source: app.owner_photo
+                            opacity: 1 if app.owner_photo_available else 0
+                            fit_mode: "contain"
+                            size_hint: None, None
+                            size: "220dp", "220dp"
+                            pos_hint: {"center_x": 0.5, "center_y": 0.5}
                     MDLabel:
-                        text: "Informations sur notre entreprise."
+                        text: "M. DEDJI Kossi Adeoto, Représentant SuperLife TOGO, Pour toutes Informations sur notre entreprise, RDV sur notre site officiel superlife-togo.com"
                         halign: "center"
                         font_size: "18sp"
+                        color: 1, 1, 1, 1
+                        size_hint_y: None
+                        height: "60dp"
 
         MDNavigationBar:
             on_switch_tabs: app.on_switch_tabs(*args)
@@ -155,10 +241,24 @@ def kv_escape(value):
 
 
 class VenteApp(MDApp):
+    logo_image = StringProperty("")
+    logo_available = BooleanProperty(False)
+    owner_photo = StringProperty("")
+    owner_photo_available = BooleanProperty(False)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._database_executor = ThreadPoolExecutor(max_workers=3)
         self._publication_widgets = {}
+
+    def on_start(self):
+        animation = Animation(
+            scale=1.12, duration=0.8, t="in_out_quad"
+        ) + Animation(
+            scale=1, duration=0.8, t="in_out_quad"
+        )
+        animation.repeat = True
+        animation.start(self.root.ids.home_logo)
 
     def _executer_en_arriere_plan(self, operation, on_success=None):
         future = self._database_executor.submit(operation)
@@ -207,7 +307,7 @@ class VenteApp(MDApp):
             )
 
     def commander_whatsapp(self, produit, prix):
-        numero = "22890000000"
+        numero = "22899057931"
         message = "Bonjour, je souhaite commander {} au prix de {}.".format(
             produit, prix
         )
@@ -417,6 +517,15 @@ MDCard:
         self._consommer_intention_notification()
 
     def build(self):
+        images_dir = Path(__file__).resolve().parent / "images"
+        logo = images_dir / "logo.png"
+        self.logo_available = logo.is_file()
+        if self.logo_available:
+            self.logo_image = str(logo)
+        owner_photo = images_dir / "proprietaire.jpg"
+        self.owner_photo_available = owner_photo.is_file()
+        if self.owner_photo_available:
+            self.owner_photo = str(owner_photo)
         interface = Builder.load_string(KV)
         self.root = interface
         self.afficher_produits()

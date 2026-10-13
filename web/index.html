@@ -72,10 +72,22 @@
               <label for="product-description">Description</label>
               <textarea id="product-description" name="description"
                         rows="4" maxlength="2000"></textarea>
-              <label for="product-image">Image</label>
-              <input id="product-image" name="image" type="file"
+              <label for="product-image-url">URL HTTPS de l’image (facultative)</label>
+              <input id="product-image-url" name="imageUrl" type="text"
+                     maxlength="2048" inputmode="url"
+                     placeholder="https://...">
+              <label for="product-image">Ou choisir un fichier</label>
+              <input id="product-image" name="imageFile" type="file"
                      accept="image/jpeg,image/png,image/webp">
-              <p class="field-help">JPEG, PNG ou WebP — 5 Mo maximum.</p>
+              <div class="image-preview hidden" data-image-preview>
+                <img alt="Aperçu de l’image">
+                <span data-image-caption></span>
+              </div>
+              <p class="field-help">
+                Un fichier JPEG, PNG ou WebP (5 Mo maximum) est hébergé par
+                Cloudinary. Sinon, une URL HTTPS saisie est utilisée. Laissez
+                les deux champs vides pour conserver l’image actuelle.
+              </p>
               <div class="form-actions">
                 <button class="button button-primary" type="submit">
                   Enregistrer le produit
@@ -116,10 +128,22 @@
               <label for="publication-date">Date</label>
               <input id="publication-date" name="date" type="text"
                      inputmode="numeric" placeholder="AAAA-MM-JJ">
-              <label for="publication-image">Image</label>
-              <input id="publication-image" name="image" type="file"
+              <label for="publication-image-url">URL HTTPS de l’image (facultative)</label>
+              <input id="publication-image-url" name="imageUrl" type="text"
+                     maxlength="2048" inputmode="url"
+                     placeholder="https://...">
+              <label for="publication-image">Ou choisir un fichier</label>
+              <input id="publication-image" name="imageFile" type="file"
                      accept="image/jpeg,image/png,image/webp">
-              <p class="field-help">JPEG, PNG ou WebP — 5 Mo maximum.</p>
+              <div class="image-preview hidden" data-image-preview>
+                <img alt="Aperçu de l’image">
+                <span data-image-caption></span>
+              </div>
+              <p class="field-help">
+                Un fichier JPEG, PNG ou WebP (5 Mo maximum) est hébergé par
+                Cloudinary. Sinon, une URL HTTPS saisie est utilisée. Laissez
+                les deux champs vides pour conserver l’image actuelle.
+              </p>
               <div class="form-actions">
                 <button class="button button-primary" type="submit">
                   Enregistrer la publication

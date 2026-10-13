@@ -16,18 +16,16 @@ import {
   setDoc,
   updateDoc,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import {
-  getDownloadURL,
-  getStorage,
-  ref,
-  uploadBytes,
-} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 import { firebaseConfig } from "./firebase-config.js";
+
+const CLOUDINARY_CLOUD_NAME = "jvljzrue";
+const CLOUDINARY_UPLOAD_PRESET = "vente_images";
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
 const $ = (selector) => document.querySelector(selector);
 
 const notice = $("#notice");
@@ -40,6 +38,7 @@ const records = { produits: [], publications: [] };
 let unsubscribeProducts;
 let unsubscribePublications;
 let noticeTimeout;
+const previewObjectUrls = new WeakMap();
 
 function showNotice(message, kind = "error") {
   notice.textContent = message;
@@ -53,8 +52,6 @@ function friendlyError(error) {
     "auth/invalid-credential": "Adresse e-mail ou mot de passe incorrect.",
     "auth/too-many-requests": "Trop de tentatives. Réessayez plus tard.",
     "permission-denied": "Accès refusé par les règles Firebase.",
-    "storage/unauthorized": "Téléversement refusé par les règles Storage.",
-    "storage/canceled": "Téléversement annulé.",
   };
   return messages[error.code] || error.message || "Une erreur inattendue est survenue.";
 }
@@ -116,10 +113,68 @@ function recordTitle(type, item) {
 function imagePreviewUrl(value) {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" ? url.href : "";
+    return url.protocol === "https:" && !url.username && !url.password
+      ? url.href : "";
   } catch {
     return "";
   }
+}
+
+function setImagePreview(form, source, caption = "") {
+  const previousObjectUrl = previewObjectUrls.get(form);
+  if (previousObjectUrl) URL.revokeObjectURL(previousObjectUrl);
+
+  const container = form.querySelector("[data-image-preview]");
+  const image = container.querySelector("img");
+  const captionElement = container.querySelector("[data-image-caption]");
+  if (!source) {
+    image.removeAttribute("src");
+    captionElement.textContent = "";
+    container.classList.add("hidden");
+    previewObjectUrls.delete(form);
+    return;
+  }
+
+  image.src = source;
+  captionElement.textContent = caption;
+  container.classList.remove("hidden");
+  if (source.startsWith("blob:")) previewObjectUrls.set(form, source);
+  else previewObjectUrls.delete(form);
+}
+
+function validateImageFile(file) {
+  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+    throw new Error("Choisissez une image JPEG, PNG ou WebP.");
+  }
+  if (file.size > MAX_IMAGE_SIZE) {
+    throw new Error("L’image ne doit pas dépasser 5 Mo pour rester compatible avec Android.");
+  }
+}
+
+async function uploadImage(file) {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    { method: "POST", body },
+  );
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error(`Réponse Cloudinary invalide (HTTP ${response.status}).`);
+  }
+  if (!response.ok) {
+    throw new Error(result.error?.message || `Échec du téléversement Cloudinary (HTTP ${response.status}).`);
+  }
+
+  const secureUrl = imagePreviewUrl(result.secure_url || "");
+  if (!secureUrl) {
+    throw new Error("Cloudinary n’a pas renvoyé d’URL HTTPS valide pour l’image.");
+  }
+  return secureUrl;
 }
 
 function renderRecords(type) {
@@ -170,20 +225,6 @@ function renderRecords(type) {
   }
 }
 
-async function uploadImage(type, recordId, file) {
-  if (!file) return "";
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-  if (!allowedTypes.includes(file.type)) {
-    throw new Error("Choisissez une image JPEG, PNG ou WebP.");
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error("L'image dépasse la taille maximale de 5 Mo.");
-  }
-  const imageRef = ref(storage, `${type}/${recordId}/${crypto.randomUUID()}`);
-  await uploadBytes(imageRef, file, { contentType: file.type });
-  return getDownloadURL(imageRef);
-}
-
 function recordIdFor(form) {
   return form.elements.id.value || crypto.randomUUID();
 }
@@ -194,8 +235,11 @@ async function saveRecord(type, form, event) {
   const formData = new FormData(form);
   const existingId = form.elements.id.value;
   const recordId = recordIdFor(form);
-  const file = form.elements.image.files[0];
+  const imageFile = form.elements.imageFile.files[0] || null;
+  const enteredImageUrl = String(formData.get("imageUrl") || "").trim();
   const oldRecord = records[type].find((item) => item.id === existingId);
+  const submitButton = form.querySelector('[type="submit"]');
+  submitButton.disabled = true;
 
   try {
     const values = isProduct
@@ -212,9 +256,13 @@ async function saveRecord(type, form, event) {
     if (!values[isProduct ? "nom" : "titre"]) {
       throw new Error(isProduct ? "Le nom est obligatoire." : "Le titre est obligatoire.");
     }
-    values.image = file
-      ? await uploadImage(type, recordId, file)
-      : oldRecord?.image || "";
+    if (imageFile) validateImageFile(imageFile);
+    if (!imageFile && enteredImageUrl && !imagePreviewUrl(enteredImageUrl)) {
+      throw new Error("L’image doit être une URL HTTPS publique valide.");
+    }
+    values.image = imageFile
+      ? await uploadImage(imageFile)
+      : enteredImageUrl || oldRecord?.image || "";
 
     const collectionRef = collection(db, type);
     if (existingId) {
@@ -228,10 +276,13 @@ async function saveRecord(type, form, event) {
     resetForm(form);
   } catch (error) {
     showNotice(friendlyError(error));
+  } finally {
+    submitButton.disabled = false;
   }
 }
 
 function resetForm(form) {
+  setImagePreview(form, "");
   form.reset();
   form.elements.id.value = "";
   $(`#${form.id}-title`).textContent = form === productForm
@@ -247,6 +298,9 @@ function editRecord(type, id) {
   }
   const form = type === "produits" ? productForm : publicationForm;
   form.elements.id.value = item.id;
+  form.elements.imageUrl.value = "";
+  const imageUrl = imagePreviewUrl(item.image || "");
+  setImagePreview(form, imageUrl, imageUrl ? "Image actuelle" : "");
   if (type === "produits") {
     form.elements.nom.value = item.nom || "";
     form.elements.prix.value = item.prix || "";
@@ -299,6 +353,42 @@ signOutButton.addEventListener("click", async () => {
 productForm.addEventListener("submit", (event) => saveRecord("produits", productForm, event));
 publicationForm.addEventListener("submit", (event) =>
   saveRecord("publications", publicationForm, event));
+
+for (const form of [productForm, publicationForm]) {
+  const updateImagePreview = () => {
+    const file = form.elements.imageFile.files[0];
+    if (file) return;
+
+    const enteredImageUrl = imagePreviewUrl(form.elements.imageUrl.value.trim());
+    if (enteredImageUrl) {
+      setImagePreview(form, enteredImageUrl, "Aperçu de l’URL");
+      return;
+    }
+
+    const collectionName = form === productForm ? "produits" : "publications";
+    const item = records[collectionName]
+      .find((record) => record.id === form.elements.id.value);
+    const currentImageUrl = imagePreviewUrl(item?.image || "");
+    setImagePreview(form, currentImageUrl, currentImageUrl ? "Image actuelle" : "");
+  };
+
+  form.elements.imageUrl.addEventListener("input", updateImagePreview);
+  form.elements.imageFile.addEventListener("change", () => {
+    const file = form.elements.imageFile.files[0];
+    if (!file) {
+      updateImagePreview();
+      return;
+    }
+    try {
+      validateImageFile(file);
+      setImagePreview(form, URL.createObjectURL(file), file.name);
+    } catch (error) {
+      form.elements.imageFile.value = "";
+      updateImagePreview();
+      showNotice(friendlyError(error));
+    }
+  });
+}
 
 document.addEventListener("click", async (event) => {
   const target = event.target.closest("[data-action], [data-cancel], .tab");
