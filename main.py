@@ -13,6 +13,8 @@ from kivy.clock import Clock
 from kivy.lang import Builder
 from kivy.logger import Logger
 from kivy.properties import BooleanProperty, NumericProperty, StringProperty
+from kivy.graphics import Color, Rectangle
+from kivy.graphics.texture import Texture
 from kivymd.app import MDApp
 from kivymd.uix.navigationbar import (
     MDNavigationBar,
@@ -45,6 +47,34 @@ class BaseNavigationItem(MDNavigationItem):
 
 class AnimatedLogo(BoxLayout):
     scale = NumericProperty(1)
+
+
+class GradientBackground(BoxLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        texture = Texture.create(size=(1, 256), colorfmt="rgba")
+        pixels = bytearray()
+        top_color = (14, 30, 59)
+        bottom_color = (19, 91, 102)
+        for y in range(256):
+            ratio = y / 255
+            color = tuple(
+                round(bottom + (top - bottom) * ratio)
+                for top, bottom in zip(top_color, bottom_color)
+            )
+            pixels.extend((*color, 255))
+        texture.blit_buffer(bytes(pixels), colorfmt="rgba", bufferfmt="ubyte")
+        texture.wrap = "clamp_to_edge"
+        texture.mag_filter = "linear"
+        texture.min_filter = "linear"
+        with self.canvas.before:
+            Color(1, 1, 1, 1)
+            self._gradient = Rectangle(texture=texture, pos=self.pos, size=self.size)
+        self.bind(pos=self._actualiser_degrade, size=self._actualiser_degrade)
+
+    def _actualiser_degrade(self, *_):
+        self._gradient.pos = self.pos
+        self._gradient.size = self.size
 
 
 KV = """
@@ -80,16 +110,10 @@ MDScreen:
 
             MDScreen:
                 name: "accueil"
-                MDBoxLayout:
+                GradientBackground:
                     orientation: "vertical"
                     padding: ["30dp", "10dp", "30dp", "30dp"]
                     spacing: "12dp"
-                    canvas.before:
-                        Color:
-                            rgba: 0.08, 0.12, 0.18, 1
-                        Rectangle:
-                            pos: self.pos
-                            size: self.size
                     MDLabel:
                         text: "Bienvenue Chez SUPERLIFE TOGO!"
                         halign: "center"
@@ -196,16 +220,10 @@ MDScreen:
 
             MDScreen:
                 name: "apropos"
-                MDBoxLayout:
+                GradientBackground:
                     orientation: "vertical"
                     padding: "30dp"
                     spacing: "20dp"
-                    canvas.before:
-                        Color:
-                            rgba: 0.08, 0.12, 0.18, 1
-                        Rectangle:
-                            pos: self.pos
-                            size: self.size
                     MDLabel:
                         text: "À PROPOS"
                         halign: "center"
@@ -232,12 +250,25 @@ MDScreen:
                             size: "220dp", "220dp"
                             pos_hint: {"center_x": 0.5, "center_y": 0.5}
                     MDLabel:
-                        text: "M. DEDJI Kossi Adeoto, Représentant SuperLife TOGO, Pour toutes Informations sur notre entreprise, RDV sur notre site officiel superlife-togo.com"
+                        text: "M. DEDJI Kossi Adeoto, Représentant SuperLife TOGO. Pour toutes informations sur notre entreprise, rendez-vous sur notre site officiel."
                         halign: "center"
                         font_size: "18sp"
                         color: 1, 1, 1, 1
                         size_hint_y: None
-                        height: "60dp"
+                        height: "90dp"
+                    Widget:
+                        size_hint_y: 1
+                    Button:
+                        text: "[u]superlife-togo.com[/u]"
+                        markup: True
+                        color: 0.78, 0.91, 1, 1
+                        bold: True
+                        font_size: "18sp"
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        size_hint_y: None
+                        height: "48dp"
+                        on_release: app.ouvrir_site()
 
         MDNavigationBar:
             id: navigation_bar
@@ -597,6 +628,9 @@ class VenteApp(MDApp):
             produit, prix
         )
         webbrowser.open("https://wa.me/{}?text={}".format(numero, quote(message)))
+
+    def ouvrir_site(self):
+        webbrowser.open("https://superlife-togo.com")
 
     def on_switch_tabs(self, bar, item, item_icon, item_text):
         self.root.ids.screen_manager.current = item.screen_name

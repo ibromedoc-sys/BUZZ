@@ -8,8 +8,9 @@ source.dir = .
 source.include_exts = py,png,jpg,jpeg,webp,kv,atlas,json
 source.exclude_dirs = .git, .buildozer, bin, venv, __pycache__, vendor, web
 
-version = 0.1
-android.numeric_version = 1
+version = 0.2
+android.numeric_version = 2
+icon.filename = %(source.dir)s/images/logo.png
 
 requirements = python3,kivy==2.3.0,kivymd==2.0.0,materialyoucolor==3.0.3,materialshapes,asynckivy,asyncgui,pyjnius,certifi
 

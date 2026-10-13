@@ -45,6 +45,11 @@ Pour chaque nouvelle version :
    `"/downloads/vente-<version>.apk"` et l'empreinte obtenue en minuscules.
 5. Déployer Firebase Hosting avec `firebase deploy --only hosting`.
 
+Le SHA-256 `000...000` présent dans le manifeste de départ est un placeholder,
+pas l'empreinte d'une APK. Il doit impérativement être remplacé par l'empreinte
+calculée après la compilation avant de déployer. La prochaine APK préparée ici
+est la version `0.2` (code `2`) et utilise `images/logo.png` comme icône.
+
 Au prochain démarrage connecté, l'application proposera le téléchargement.
 Elle vérifie l'empreinte avant de lancer l'installateur Android. Android peut
 demander à l'utilisateur d'autoriser l'installation depuis VENTE, puis une
