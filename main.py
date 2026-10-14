@@ -1,20 +1,15 @@
-import hashlib
-import json
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
-from http.client import HTTPException
 from pathlib import Path
-from urllib.error import URLError
-from urllib.parse import quote, urljoin, urlparse
-from urllib.request import Request, urlopen
+from urllib.parse import quote
 
 from kivy.animation import Animation
 from kivy.clock import Clock
 from kivy.lang import Builder
-from kivy.logger import Logger
 from kivy.properties import BooleanProperty, NumericProperty, StringProperty
 from kivy.graphics import Color, Rectangle
 from kivy.graphics.texture import Texture
+from kivy.metrics import dp
 from kivymd.app import MDApp
 from kivymd.uix.navigationbar import (
     MDNavigationBar,
@@ -27,17 +22,7 @@ from database import FirebaseError, obtenir_produits, obtenir_publications, imag
 
 from kivy.uix.popup import Popup
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
 from kivy.uix.label import Label as KivyLabel
-
-UPDATE_MANIFEST_URL = "https://vente-24ed2.web.app/app-update.json"
-GITHUB_RELEASE_PATH_PREFIX = "/ibromedoc-sys/VENTE/releases/download/"
-GITHUB_RELEASE_ASSET_HOSTS = {
-    "github.com",
-    "objects.githubusercontent.com",
-    "release-assets.githubusercontent.com",
-}
-MAX_APK_SIZE = 250 * 1024 * 1024
 
 try:
     from android import activity
@@ -141,14 +126,21 @@ MDScreen:
                             theme_text_color: "Custom"
                             text_color: 1, 1, 1, 1
                             opacity: 0 if app.logo_available else 1
-                        Image:
-                            id: logo_image
-                            source: app.logo_image
-                            opacity: 1 if app.logo_available else 0
-                            fit_mode: "contain"
-                            size_hint: 1, 1
+                        RelativeLayout:
                             size_hint_y: None
                             height: "120dp"
+                            Image:
+                                id: logo_image
+                                source: app.logo_image
+                                opacity: 1 if app.logo_available else 0
+                                fit_mode: "contain"
+                                size_hint: 1, 1
+                            Image:
+                                id: logo_image_next
+                                source: app.logo_next_image
+                                opacity: 0
+                                fit_mode: "contain"
+                                size_hint: 1, 1
                         MDLabel:
                             text: "VENTE"
                             halign: "center"
@@ -157,7 +149,7 @@ MDScreen:
                             color: 1, 1, 1, 1
                             opacity: 0 if app.logo_available else 1
                     MDLabel:
-                        text: "Découvrez nos produits et nos infos en exclusivités dans le domaine de l'entrepreneuriat."
+                        text: "Découvrez nos produits et nos infos en exclusivités."
                         halign: "center"
                         font_size: "18sp"
                         color: 1, 1, 1, 1
@@ -256,7 +248,7 @@ MDScreen:
                             size: "220dp", "220dp"
                             pos_hint: {"center_x": 0.5, "center_y": 0.5}
                     MDLabel:
-                        text: "M. DEDJI Kossi Adeoto, Représentant SuperLife TOGO. Pour toutes informations sur notre entreprise, rendez-vous sur notre site officiel."
+                        text: " Pour toutes informations sur notre entreprise, rendez-vous sur notre site Web officiel."
                         halign: "center"
                         font_size: "18sp"
                         color: 1, 1, 1, 1
@@ -265,7 +257,7 @@ MDScreen:
                     Widget:
                         size_hint_y: 1
                     Button:
-                        text: "[u]superlife-togo.com[/u]"
+                        text: "[u]SUPERLIFE-TOGO.COM[/u]"
                         markup: True
                         color: 0.78, 0.91, 1, 1
                         bold: True
@@ -313,6 +305,7 @@ def kv_escape(value):
 
 class VenteApp(MDApp):
     logo_image = StringProperty("")
+    logo_next_image = StringProperty("")
     logo_available = BooleanProperty(False)
     owner_photo = StringProperty("")
     owner_photo_available = BooleanProperty(False)
@@ -321,274 +314,44 @@ class VenteApp(MDApp):
         super().__init__(**kwargs)
         self._database_executor = ThreadPoolExecutor(max_workers=3)
         self._publication_widgets = {}
-        self._update_popup = None
+        self._home_logo_paths = []
+        self._home_logo_index = 0
+        self._home_logo_active_id = "logo_image"
 
-    def _verifier_mise_a_jour(self):
-        if activity is None:
-            return
-        self._database_executor.submit(self._charger_mise_a_jour)
+    def _animer_logo_suivant(self, _dt):
+        if len(self._home_logo_paths) < 2 or self.root is None:
+            return False
 
-    def _charger_mise_a_jour(self):
-        try:
-            from jnius import JavaException, autoclass
-        except ImportError as error:
-            Logger.warning("VENTE: vérification de version indisponible: %s" % error)
-            return
-
-        try:
-            request = Request(
-                UPDATE_MANIFEST_URL,
-                headers={"User-Agent": "VENTE-Android"},
-            )
-            with urlopen(request, timeout=15) as response:
-                final_url = urlparse(response.geturl())
-                if (
-                    final_url.scheme != "https"
-                    or final_url.hostname != urlparse(UPDATE_MANIFEST_URL).hostname
-                ):
-                    raise ValueError("Le manifeste a été redirigé vers un autre hôte.")
-                manifest = json.loads(response.read(64 * 1024).decode("utf-8"))
-
-            if not isinstance(manifest, dict):
-                raise ValueError("Le manifeste de mise à jour est invalide.")
-            version_code = manifest.get("version_code")
-            version_name = manifest.get("version_name")
-            apk_url = manifest.get("apk_url")
-            apk_hash = manifest.get("sha256")
-            parsed_apk_url = urlparse(apk_url) if isinstance(apk_url, str) else None
-            if (
-                isinstance(version_code, bool)
-                or not isinstance(version_code, int)
-                or version_code < 1
-                or version_code > 2_100_000_000
-                or not isinstance(version_name, str)
-                or not version_name.strip()
-                or parsed_apk_url is None
-                or parsed_apk_url.scheme != "https"
-                or parsed_apk_url.hostname != "github.com"
-                or not parsed_apk_url.path.startswith(GITHUB_RELEASE_PATH_PREFIX)
-                or not parsed_apk_url.path.lower().endswith(".apk")
-                or not isinstance(apk_hash, str)
-                or len(apk_hash) != 64
-                or any(character not in "0123456789abcdefABCDEF" for character in apk_hash)
-            ):
-                raise ValueError(
-                    "Le manifeste de mise à jour contient des données invalides."
-                )
-
-            activity_class = autoclass("org.kivy.android.PythonActivity")
-            installed_code = int(
-                autoclass("com.vente.app.ApkInstaller").getInstalledVersionCode(
-                    activity_class.mActivity
-                )
-            )
-            if version_code > installed_code:
-                update = {
-                    "version_code": version_code,
-                    "version_name": version_name.strip(),
-                    "apk_url": apk_url,
-                    "sha256": apk_hash.lower(),
-                }
-                Clock.schedule_once(
-                    lambda dt, update=update: self._proposer_mise_a_jour(update), 0
-                )
-        except (
-            JavaException,
-            AttributeError,
-            RuntimeError,
-            URLError,
-            TimeoutError,
-            OSError,
-            ValueError,
-            TypeError,
-            HTTPException,
-        ) as error:
-            Logger.warning("VENTE: vérification des mises à jour impossible: %s" % error)
-
-    def _creer_popup(self, title, message, buttons):
-        layout = BoxLayout(
-            orientation="vertical", padding="12dp", spacing="8dp"
+        current_index = self._home_logo_index
+        next_index = (current_index + 1) % len(self._home_logo_paths)
+        next_next_index = (next_index + 1) % len(self._home_logo_paths)
+        outgoing = self.root.ids[self._home_logo_active_id]
+        incoming_id = (
+            "logo_image_next"
+            if self._home_logo_active_id == "logo_image"
+            else "logo_image"
         )
-        message_label = KivyLabel(
-            text=message,
-            halign="center",
-            valign="middle",
-        )
-        layout.add_widget(message_label)
-        layout.bind(
-            width=lambda instance, width: setattr(
-                message_label, "text_size", (width - 24, None)
-            )
-        )
-        button_row = BoxLayout(
-            orientation="horizontal", size_hint_y=None, height="48dp", spacing="8dp"
-        )
-        if buttons:
-            layout.add_widget(button_row)
-        popup = Popup(
-            title=title,
-            content=layout,
-            size_hint=(0.9, None),
-            height="210dp" if buttons else "150dp",
-            auto_dismiss=False,
-        )
-        for label, callback in buttons:
-            button = Button(text=label)
-            button.bind(on_release=lambda instance, cb=callback: cb(popup))
-            button_row.add_widget(button)
-        popup.open()
-        return popup
+        incoming = self.root.ids[incoming_id]
 
-    def _proposer_mise_a_jour(self, update):
-        self._creer_popup(
-            "Mise à jour disponible",
-            "La version {} de VENTE est disponible. Voulez-vous la télécharger ?".format(
-                update["version_name"]
-            ),
-            [
-                ("Plus tard", lambda popup: popup.dismiss()),
-                ("Télécharger", lambda popup: self._telecharger_mise_a_jour(popup, update)),
-            ],
+        incoming.source = str(self._home_logo_paths[next_index])
+        incoming.pos = (dp(48), 0)
+        incoming.opacity = 0
+        Animation(x=-dp(48), opacity=0, duration=0.45, t="out_quad").start(
+            outgoing
         )
 
-    def _telecharger_mise_a_jour(self, popup, update):
-        popup.dismiss()
-        self._update_popup = self._creer_popup(
-            "Téléchargement",
-            "Téléchargement de la mise à jour en cours…",
-            [],
+        def terminer_transition(*_):
+            outgoing.x = dp(48)
+            outgoing.source = str(self._home_logo_paths[next_next_index])
+            self._home_logo_index = next_index
+            self._home_logo_active_id = incoming_id
+
+        incoming_animation = Animation(
+            x=0, opacity=1, duration=0.45, t="out_quad"
         )
-        future = self._database_executor.submit(self._telecharger_apk, update)
-
-        def terminer(tache):
-            try:
-                apk_path = tache.result()
-            except (
-                URLError,
-                TimeoutError,
-                OSError,
-                ValueError,
-                TypeError,
-                HTTPException,
-            ) as error:
-                Clock.schedule_once(
-                    lambda dt, error=error: self._echec_telechargement(error), 0
-                )
-                return
-            Clock.schedule_once(
-                lambda dt, apk_path=apk_path: self._proposer_installation(apk_path), 0
-            )
-
-        future.add_done_callback(terminer)
-
-    def _telecharger_apk(self, update):
-        request = Request(update["apk_url"], headers={"User-Agent": "VENTE-Android"})
-        update_dir = Path(self.user_data_dir) / "updates"
-        update_dir.mkdir(parents=True, exist_ok=True)
-        apk_path = update_dir / "vente-update.apk"
-        temporary_path = update_dir / "vente-update.apk.part"
-        digest = hashlib.sha256()
-        downloaded = 0
-        try:
-            with urlopen(request, timeout=30) as response:
-                final_url = urlparse(response.geturl())
-                if (
-                    final_url.scheme != "https"
-                    or final_url.hostname not in GITHUB_RELEASE_ASSET_HOSTS
-                ):
-                    raise ValueError(
-                        "Le téléchargement a été redirigé vers un hôte GitHub non autorisé."
-                    )
-                content_length = response.headers.get("Content-Length")
-                if content_length and int(content_length) > MAX_APK_SIZE:
-                    raise ValueError("Le fichier APK dépasse la taille maximale autorisée.")
-                with temporary_path.open("wb") as apk_file:
-                    while True:
-                        chunk = response.read(1024 * 1024)
-                        if not chunk:
-                            break
-                        downloaded += len(chunk)
-                        if downloaded > MAX_APK_SIZE:
-                            raise ValueError(
-                                "Le fichier APK dépasse la taille maximale autorisée."
-                            )
-                        digest.update(chunk)
-                        apk_file.write(chunk)
-            if digest.hexdigest() != update["sha256"]:
-                raise ValueError("La vérification de sécurité de l’APK a échoué.")
-            temporary_path.replace(apk_path)
-            return str(apk_path)
-        finally:
-            if temporary_path.exists():
-                temporary_path.unlink()
-
-    def _echec_telechargement(self, error):
-        if self._update_popup is not None:
-            self._update_popup.dismiss()
-            self._update_popup = None
-        self._afficher_erreur(
-            ValueError("Impossible de télécharger la mise à jour : {}".format(error))
-        )
-
-    def _proposer_installation(self, apk_path):
-        if self._update_popup is not None:
-            self._update_popup.dismiss()
-            self._update_popup = None
-
-        def installer(popup):
-            popup.dismiss()
-            try:
-                from jnius import JavaException, autoclass
-            except ImportError as error:
-                self._afficher_erreur(
-                    ValueError("PyJNIus est indisponible : {}".format(error))
-                )
-                return
-
-            try:
-                activity_class = autoclass("org.kivy.android.PythonActivity")
-                autoclass("com.vente.app.ApkInstaller").install(
-                    activity_class.mActivity, apk_path
-                )
-            except (JavaException, ImportError, AttributeError, RuntimeError) as error:
-                self._afficher_erreur(
-                    ValueError("Impossible de lancer l’installateur Android : {}".format(error))
-                )
-
-        self._creer_popup(
-            "Téléchargement terminé",
-            "L’APK a été vérifié. Android vous demandera de confirmer son installation.",
-            [("Installer", installer), ("Plus tard", lambda popup: popup.dismiss())],
-        )
-
-    def _reprendre_installation(self):
-        if activity is None:
-            return
-        try:
-            from jnius import JavaException, autoclass
-        except ImportError as error:
-            self._afficher_erreur(
-                ValueError("PyJNIus est indisponible : {}".format(error))
-            )
-            return
-
-        try:
-            activity_class = autoclass("org.kivy.android.PythonActivity")
-            status = autoclass("com.vente.app.ApkInstaller").resumeInstall(
-                activity_class.mActivity
-            )
-        except (JavaException, ImportError, AttributeError, RuntimeError) as error:
-            self._afficher_erreur(
-                ValueError("Impossible de reprendre l’installation Android : {}".format(error))
-            )
-            return
-        if status == 2:
-            self._afficher_erreur(
-                ValueError(
-                    "Autorisez VENTE à installer des applications depuis cette source "
-                    "dans les paramètres Android, puis revenez dans VENTE."
-                )
-            )
+        incoming_animation.bind(on_complete=terminer_transition)
+        incoming_animation.start(incoming)
+        return True
 
     def _executer_en_arriere_plan(self, operation, on_success=None):
         future = self._database_executor.submit(operation)
@@ -864,21 +627,33 @@ MDCard:
         blink.repeat = True
         blink.start(self.root.ids.produits_shortcut)
         blink.start(self.root.ids.infos_shortcut)
+        if len(self._home_logo_paths) > 1:
+            Clock.schedule_interval(self._animer_logo_suivant, 3)
         if activity is not None:
             activity.bind(on_new_intent=self._on_new_intent)
         self._consommer_intention_notification()
-        Clock.schedule_once(lambda dt: self._verifier_mise_a_jour(), 2)
 
     def on_resume(self):
         self._consommer_intention_notification()
-        self._reprendre_installation()
 
     def build(self):
         images_dir = Path(__file__).resolve().parent / "images"
         logo = images_dir / "logo.png"
-        self.logo_available = logo.is_file()
+        self._home_logo_paths = [logo] if logo.is_file() else []
+        logo_index = 1
+        while (images_dir / "logo{}.png".format(logo_index)).is_file():
+            self._home_logo_paths.append(
+                images_dir / "logo{}.png".format(logo_index)
+            )
+            logo_index += 1
+        self.logo_available = bool(self._home_logo_paths)
         if self.logo_available:
-            self.logo_image = str(logo)
+            self.logo_image = str(self._home_logo_paths[0])
+            self.logo_next_image = str(
+                self._home_logo_paths[1]
+                if len(self._home_logo_paths) > 1
+                else self._home_logo_paths[0]
+            )
         owner_photo = images_dir / "proprietaire.jpg"
         self.owner_photo_available = owner_photo.is_file()
         if self.owner_photo_available:

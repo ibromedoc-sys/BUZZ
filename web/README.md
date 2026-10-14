@@ -26,42 +26,38 @@ firebase deploy --only hosting
 Héberger le tableau de bord en HTTPS via Firebase Hosting. Ne pas l'ouvrir
 directement depuis `file://` : les modules Firebase exigent un serveur Web.
 
-## Publier une mise à jour Android
+## Distribuer l'application et les mises à jour via Google Play
 
-L'application vérifie `https://vente-24ed2.web.app/app-update.json` au démarrage.
-Le manifeste versionné dans `web/app-update.json` doit contenir un `version_code`
-entier supérieur à celui de l'application installée, un `version_name`, l'URL
-HTTPS directe de l'APK jointe à une GitHub Release du dépôt public
-`ibromedoc-sys/VENTE` et son empreinte SHA-256. L'application accepte le lien de
-téléchargement de ce dépôt, puis les domaines de fichiers GitHub utilisés pour
-la redirection du téléchargement.
+Les mises à jour de VENTE seront distribuées par Google Play ; l'application ne
+vérifie plus un manifeste distant et ne télécharge ni n'installe d'APK depuis
+GitHub. Le fichier `web/app-update.json` et l'ancien mécanisme d'installation
+directe ne sont plus utilisés. Firebase Hosting reste dédié au tableau de bord.
 
-Pour chaque nouvelle version :
+L'identifiant Android actuel est `com.vente.app` (`package.domain` +
+`package.name` dans `buildozer.spec`) : il doit rester identique pour publier
+des mises à jour de la même application Play. Le format de sortie release est
+configuré en Android App Bundle (`aab`) ; le workflow GitHub Actions actuel
+construit encore une APK debug de test, pas un bundle prêt à téléverser dans la
+Play Console.
 
-1. Incrémenter `android.numeric_version` dans `buildozer.spec` et modifier
-   `version` si nécessaire, puis générer l'APK.
-2. Calculer l'empreinte de l'APK dans PowerShell (en adaptant son emplacement),
-   par exemple `(Get-FileHash .\bin\vente-0.2-arm64-v8a-debug.apk -Algorithm SHA256).Hash`.
-3. Créer sur GitHub une Release avec le tag `v<version>` et joindre l'APK sous
-   le nom `vente-<version>.apk`. Le dépôt doit être public pour que l'application
-   puisse télécharger l'APK sans identifiants.
-4. Mettre à jour `web/app-update.json` avec le nouveau code et nom de version,
-   l'URL de l'asset de la Release et l'empreinte SHA-256 obtenue (en minuscules).
-5. Déployer uniquement le manifeste et le tableau de bord avec
-   `firebase deploy --only hosting`. Ne pas placer l'APK dans `web` : Firebase
-   Hosting du forfait Spark refuse les exécutables.
+Avant une publication Play, il faudra :
 
-La version préparée ici est `0.2` (code `2`), avec le lien GitHub Release
-`https://github.com/ibromedoc-sys/VENTE/releases/download/v0.2/vente-0.2.apk`.
-Avant de déployer le manifeste, vérifier que son empreinte SHA-256 correspond
-bien à l'APK compilée ; sinon, la remplacer par la valeur calculée. Une
-empreinte qui ne correspond pas empêche volontairement l'installation.
+1. Créer l'application dans la Play Console et compléter les informations
+   demandées, puis activer Play App Signing.
+2. Incrémenter `android.numeric_version` à chaque publication (la version
+   préparée est actuellement le code `2`) et modifier `version` pour le nom
+   affiché.
+3. Compiler un bundle release signé avec la clé d'envoi configurée pour Play,
+   puis téléverser le `.aab` dans une piste de test interne avant la production.
+   Garder une sauvegarde privée de la clé d'envoi ; ne pas la committer.
+4. Installer la version de test depuis Play. Ensuite, Play gère la distribution
+   des mises à jour selon les réglages de l'utilisateur (mises à jour
+   automatiques, ou mise à jour manuelle depuis le Play Store).
 
-Au prochain démarrage connecté, l'application proposera le téléchargement.
-Elle vérifie l'empreinte avant de lancer l'installateur Android. Android peut
-demander à l'utilisateur d'autoriser l'installation depuis VENTE, puis une
-confirmation explicite de l'installation. Firebase Hosting ne sert que le
-manifeste ; l'APK est distribuée par la GitHub Release.
+L'APK debug distribuée auparavant hors Play peut avoir une signature différente
+de celle installée par Play. Si Android refuse la première installation Play
+par-dessus, il faudra désinstaller l'ancienne APK puis installer l'application
+depuis la piste de test Play ; les données locales peuvent être effacées.
 
 Les lectures des collections `produits` et `publications` sont publiques pour
 les appareils clients. Seuls les jetons portant `admin: true` peuvent écrire
@@ -101,5 +97,6 @@ facturation ni déployer `storage.rules`.
 - Conservation de l'image existante si aucun nouveau fichier n'est sélectionné.
 - Connexion d'un compte sans `admin: true` : aucune écriture autorisée.
 - Affichage des URL d'images sur l'application Android et un second appareil.
+- Publication Android via une piste de test interne Google Play.
 - Ne pas déployer les règles Storage ni modifier le forfait Firebase pour
   cette solution.

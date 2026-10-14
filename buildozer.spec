@@ -23,7 +23,7 @@ android.minapi = 24
 android.ndk_api = 24
 android.archs = arm64-v8a
 
-android.permissions = INTERNET,POST_NOTIFICATIONS,REQUEST_INSTALL_PACKAGES
+android.permissions = INTERNET,POST_NOTIFICATIONS
 android.enable_androidx = True
 android.gradle_dependencies = com.google.firebase:firebase-messaging:24.1.2
 android.add_src = %(source.dir)s/android_src
@@ -32,6 +32,7 @@ android.add_resources = %(source.dir)s/android_src/res
 
 android.allow_backup = True
 android.debug_artifact = apk
+android.release_artifact = aab
 
 p4a.url = https://github.com/kivy/python-for-android.git
 p4a.branch = master
