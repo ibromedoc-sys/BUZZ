@@ -31,6 +31,12 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label as KivyLabel
 
 UPDATE_MANIFEST_URL = "https://vente-24ed2.web.app/app-update.json"
+GITHUB_RELEASE_PATH_PREFIX = "/ibromedoc-sys/VENTE/releases/download/"
+GITHUB_RELEASE_ASSET_HOSTS = {
+    "github.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+}
 MAX_APK_SIZE = 250 * 1024 * 1024
 
 try:
@@ -347,9 +353,9 @@ class VenteApp(MDApp):
                 raise ValueError("Le manifeste de mise à jour est invalide.")
             version_code = manifest.get("version_code")
             version_name = manifest.get("version_name")
-            apk_url = urljoin(UPDATE_MANIFEST_URL, manifest.get("apk_url", ""))
+            apk_url = manifest.get("apk_url")
             apk_hash = manifest.get("sha256")
-            parsed_apk_url = urlparse(apk_url)
+            parsed_apk_url = urlparse(apk_url) if isinstance(apk_url, str) else None
             if (
                 isinstance(version_code, bool)
                 or not isinstance(version_code, int)
@@ -357,14 +363,18 @@ class VenteApp(MDApp):
                 or version_code > 2_100_000_000
                 or not isinstance(version_name, str)
                 or not version_name.strip()
+                or parsed_apk_url is None
                 or parsed_apk_url.scheme != "https"
-                or parsed_apk_url.hostname
-                != urlparse(UPDATE_MANIFEST_URL).hostname
+                or parsed_apk_url.hostname != "github.com"
+                or not parsed_apk_url.path.startswith(GITHUB_RELEASE_PATH_PREFIX)
+                or not parsed_apk_url.path.lower().endswith(".apk")
                 or not isinstance(apk_hash, str)
                 or len(apk_hash) != 64
                 or any(character not in "0123456789abcdefABCDEF" for character in apk_hash)
             ):
-                raise ValueError("Le manifeste de mise à jour contient des données invalides.")
+                raise ValueError(
+                    "Le manifeste de mise à jour contient des données invalides."
+                )
 
             activity_class = autoclass("org.kivy.android.PythonActivity")
             installed_code = int(
@@ -484,9 +494,11 @@ class VenteApp(MDApp):
                 final_url = urlparse(response.geturl())
                 if (
                     final_url.scheme != "https"
-                    or final_url.hostname != urlparse(UPDATE_MANIFEST_URL).hostname
+                    or final_url.hostname not in GITHUB_RELEASE_ASSET_HOSTS
                 ):
-                    raise ValueError("Le téléchargement a été redirigé vers un autre hôte.")
+                    raise ValueError(
+                        "Le téléchargement a été redirigé vers un hôte GitHub non autorisé."
+                    )
                 content_length = response.headers.get("Content-Length")
                 if content_length and int(content_length) > MAX_APK_SIZE:
                     raise ValueError("Le fichier APK dépasse la taille maximale autorisée.")
@@ -497,7 +509,9 @@ class VenteApp(MDApp):
                             break
                         downloaded += len(chunk)
                         if downloaded > MAX_APK_SIZE:
-                            raise ValueError("Le fichier APK dépasse la taille maximale autorisée.")
+                            raise ValueError(
+                                "Le fichier APK dépasse la taille maximale autorisée."
+                            )
                         digest.update(chunk)
                         apk_file.write(chunk)
             if digest.hexdigest() != update["sha256"]:

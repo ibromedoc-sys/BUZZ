@@ -1,6 +1,6 @@
 {
   "version_code": 2,
   "version_name": "0.2",
-  "apk_url": "/downloads/vente-0.2.apk",
-  "sha256": "F0893C9D296499BA0BCBDB0E8570A0168E79533DA8D3A149CE89669AC35CB48E"
+  "apk_url": "https://github.com/ibromedoc-sys/VENTE/releases/download/v0.2/vente-0.2-arm64-v8a-debug.apk",
+  "sha256": "ACAC214198D17C828677597BDBC8D32510751702E6A2DECA80C7CDAA62958A43"
 }
