@@ -40,14 +40,8 @@ Pour chaque nouvelle version :
 
 1. Incrémenter `android.numeric_version` dans `buildozer.spec` et modifier
    `version` si nécessaire, puis générer l'APK.
-2. Télécharger l'artefact `VENTE-APK-RELEASE` du workflow GitHub Actions et
-   calculer l'empreinte de l'APK release dans PowerShell, par exemple :
-
-   ```powershell
-   $apk = Get-ChildItem .\bin\*-release.apk | Select-Object -First 1
-   (Get-FileHash $apk.FullName -Algorithm SHA256).Hash
-   ```
-
+2. Calculer l'empreinte de l'APK dans PowerShell (en adaptant son emplacement),
+   par exemple `(Get-FileHash .\bin\vente-0.2-arm64-v8a-debug.apk -Algorithm SHA256).Hash`.
 3. Créer sur GitHub une Release avec le tag `v<version>` et joindre l'APK sous
    le nom `vente-<version>.apk`. Le dépôt doit être public pour que l'application
    puisse télécharger l'APK sans identifiants.
@@ -73,40 +67,6 @@ Les lectures des collections `produits` et `publications` sont publiques pour
 les appareils clients. Seuls les jetons portant `admin: true` peuvent écrire
 dans Firestore. Le compte admin doit se déconnecter puis se reconnecter (ou
 renouveler son jeton) après modification de ses claims.
-
-## Signature des APK compilées par GitHub Actions
-
-Le workflow `.github/workflows/build-apk.yml` construit une APK `release`
-signée, puis l'envoie comme artefact `VENTE-APK-RELEASE`. Pour que chaque build
-utilise la même identité de signature :
-
-1. Créer une seule fois un keystore de publication dans un emplacement sûr,
-   par exemple avec :
-
-   ```powershell
-   keytool -genkeypair -v -keystore vente-release.jks -alias vente -keyalg RSA -keysize 2048 -validity 10000
-   ```
-
-   Choisir et conserver les mots de passe sans les mettre dans le dépôt.
-2. Encoder le fichier keystore en Base64 sous Windows PowerShell :
-   `[Convert]::ToBase64String([IO.File]::ReadAllBytes(".\vente-release.jks"))`.
-3. Dans GitHub, ouvrir **Settings → Secrets and variables → Actions → New
-   repository secret**, puis créer les secrets `ANDROID_KEYSTORE_BASE64`
-   (résultat Base64), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (ici
-   `vente`) et `ANDROID_KEY_PASSWORD`.
-4. Sauvegarder le keystore et ses mots de passe dans un endroit sûr et chiffré.
-   Ne jamais régénérer cette clé pour les futures mises à jour : si elle est
-   perdue, Android ne pourra plus installer les APK suivantes par-dessus celles
-   signées avec cette clé.
-
-Les secrets ne sont utilisés que sur le runner GitHub ; le keystore est écrit
-temporairement dans `RUNNER_TEMP`, hors du dépôt, et n'est pas inclus dans
-l'artefact APK. Les secrets doivent être créés avant le prochain lancement du
-workflow. L'APK `0.2` actuellement publiée a été compilée en debug, sans clé
-persistante connue. La nouvelle clé release ne correspondra donc pas à sa
-signature : pour installer la première APK release, il faudra désinstaller
-l'ancienne application, puis conserver cette nouvelle clé pour tous les builds
-futurs.
 
 ## Hébergement d'images
 
