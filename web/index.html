@@ -41,7 +41,7 @@
         <div class="page-heading">
           <div>
             <p class="eyebrow">TABLEAU DE BORD</p>
-            <h1>Gérer le catalogue</h1>
+            <h1>Gérer le contenu de BUZZ</h1>
           </div>
           <span id="admin-email" class="admin-email"></span>
         </div>
@@ -52,6 +52,9 @@
           </button>
           <button class="tab" type="button" data-panel="publications-panel">
             Publications
+          </button>
+          <button class="tab" type="button" data-panel="content-panel">
+            Accueil et infos
           </button>
         </nav>
 
@@ -162,6 +165,134 @@
               </div>
               <div id="publication-list" class="record-list"></div>
             </section>
+          </div>
+        </section>
+
+        <section id="content-panel" class="management-panel hidden">
+          <div class="section-grid">
+            <form id="home-content-form" class="editor-card content-editor">
+              <div class="card-heading">
+                <div>
+                  <p class="eyebrow">ACCUEIL</p>
+                  <h2>Textes de l’accueil</h2>
+                </div>
+              </div>
+              <label for="home-title">Titre</label>
+              <input id="home-title" name="accueil_titre" maxlength="160"
+                     data-content-text required>
+              <label for="home-description">Texte de présentation</label>
+              <textarea id="home-description" name="accueil_description"
+                        rows="3" maxlength="1000" data-content-text></textarea>
+              <label for="home-products-button">Bouton Produits</label>
+              <input id="home-products-button" name="accueil_bouton_produits"
+                     maxlength="60" data-content-text required>
+              <label for="home-infos-button">Bouton Infos</label>
+              <input id="home-infos-button" name="accueil_bouton_infos"
+                     maxlength="60" data-content-text required>
+
+              <div class="content-image-field" data-content-image="logo_1">
+                <label for="home-logo-1-url">Logo 1 — URL HTTPS (facultative)</label>
+                <input id="home-logo-1-url" name="url_logo_1" type="url"
+                       maxlength="2048" placeholder="https://...">
+                <label for="home-logo-1-file">Ou choisir une image</label>
+                <input id="home-logo-1-file" name="file_logo_1" type="file"
+                       accept="image/jpeg,image/png,image/webp">
+                <div class="image-preview hidden" data-content-preview>
+                  <img alt="Aperçu du logo 1">
+                  <span data-content-caption></span>
+                </div>
+              </div>
+              <div class="content-image-field" data-content-image="logo_2">
+                <label for="home-logo-2-url">Logo 2 — URL HTTPS (facultative)</label>
+                <input id="home-logo-2-url" name="url_logo_2" type="url"
+                       maxlength="2048" placeholder="https://...">
+                <label for="home-logo-2-file">Ou choisir une image</label>
+                <input id="home-logo-2-file" name="file_logo_2" type="file"
+                       accept="image/jpeg,image/png,image/webp">
+                <div class="image-preview hidden" data-content-preview>
+                  <img alt="Aperçu du logo 2">
+                  <span data-content-caption></span>
+                </div>
+              </div>
+              <div class="content-image-field" data-content-image="logo_3">
+                <label for="home-logo-3-url">Logo 3 — URL HTTPS (facultative)</label>
+                <input id="home-logo-3-url" name="url_logo_3" type="url"
+                       maxlength="2048" placeholder="https://...">
+                <label for="home-logo-3-file">Ou choisir une image</label>
+                <input id="home-logo-3-file" name="file_logo_3" type="file"
+                       accept="image/jpeg,image/png,image/webp">
+                <div class="image-preview hidden" data-content-preview>
+                  <img alt="Aperçu du logo 3">
+                  <span data-content-caption></span>
+                </div>
+              </div>
+              <div class="content-image-field" data-content-image="logo_4">
+                <label for="home-logo-4-url">Logo 4 — URL HTTPS (facultative)</label>
+                <input id="home-logo-4-url" name="url_logo_4" type="url"
+                       maxlength="2048" placeholder="https://...">
+                <label for="home-logo-4-file">Ou choisir une image</label>
+                <input id="home-logo-4-file" name="file_logo_4" type="file"
+                       accept="image/jpeg,image/png,image/webp">
+                <div class="image-preview hidden" data-content-preview>
+                  <img alt="Aperçu du logo 4">
+                  <span data-content-caption></span>
+                </div>
+              </div>
+              <p class="field-help">
+                Les quatre logos alternent sur l’accueil. Images JPEG, PNG ou
+                WebP de 5 Mo maximum, hébergées sur Cloudinary. Sans nouvelle
+                image ou URL, l’image actuelle est conservée.
+              </p>
+              <button class="button button-primary" type="submit">
+                Enregistrer l’accueil
+              </button>
+            </form>
+
+            <form id="about-content-form" class="editor-card content-editor">
+              <div class="card-heading">
+                <div>
+                  <p class="eyebrow">INFOS ET À PROPOS</p>
+                  <h2>Textes et image</h2>
+                </div>
+              </div>
+              <p class="field-help">
+                Le titre des actualités et le contenu de la page « À propos »
+                sont modifiables ici. Les publications restent dans leur onglet.
+              </p>
+              <label for="infos-title">Titre de la page Infos</label>
+              <input id="infos-title" name="infos_titre" maxlength="160"
+                     data-content-text required>
+              <label for="about-title">Titre À propos</label>
+              <input id="about-title" name="apropos_titre" maxlength="160"
+                     data-content-text required>
+              <label for="about-description">Texte À propos</label>
+              <textarea id="about-description" name="apropos_description"
+                        rows="4" maxlength="2000" data-content-text></textarea>
+              <label for="about-link-text">Texte du lien du site</label>
+              <input id="about-link-text" name="apropos_lien_texte"
+                     maxlength="120" data-content-text required>
+
+              <div class="content-image-field" data-content-image="photo">
+                <label for="about-photo-url">Photo — URL HTTPS (facultative)</label>
+                <input id="about-photo-url" name="url_photo" type="url"
+                       maxlength="2048" placeholder="https://...">
+                <label for="about-photo-file">Ou choisir une image</label>
+                <input id="about-photo-file" name="file_photo" type="file"
+                       accept="image/jpeg,image/png,image/webp">
+                <div class="image-preview hidden" data-content-preview>
+                  <img alt="Aperçu de la photo À propos">
+                  <span data-content-caption></span>
+                </div>
+              </div>
+              <p class="field-help">
+                La destination du lien reste le site officiel actuel. Image
+                JPEG, PNG ou WebP de 5 Mo maximum. Sans remplacement, la photo
+                actuelle est conservée.
+              </p>
+              <button class="button button-primary" type="submit">
+                Enregistrer les infos
+              </button>
+            </form>
           </div>
         </section>
       </section>

@@ -18,7 +18,13 @@ from kivymd.uix.navigationbar import (
     MDNavigationItemLabel,
 )
 
-from database import FirebaseError, obtenir_produits, obtenir_publications, image_locale
+from database import (
+    FirebaseError,
+    image_locale,
+    obtenir_contenu_application,
+    obtenir_produits,
+    obtenir_publications,
+)
 
 from kivy.uix.popup import Popup
 from kivy.uix.boxlayout import BoxLayout
@@ -106,7 +112,7 @@ MDScreen:
                     padding: ["30dp", "10dp", "30dp", "30dp"]
                     spacing: "12dp"
                     MDLabel:
-                        text: "Bienvenue Chez SUPERLIFE TOGO!"
+                        text: app.accueil_titre
                         halign: "center"
                         font_size: "30sp"
                         bold: True
@@ -149,7 +155,7 @@ MDScreen:
                             color: 1, 1, 1, 1
                             opacity: 0 if app.logo_available else 1
                     MDLabel:
-                        text: "Découvrez nos produits et nos infos en exclusivités."
+                        text: app.accueil_description
                         halign: "center"
                         font_size: "18sp"
                         color: 1, 1, 1, 1
@@ -169,7 +175,7 @@ MDScreen:
                             width: "130dp"
                             on_release: app.ouvrir_onglet("produits")
                             MDButtonText:
-                                text: "PRODUITS"
+                                text: app.accueil_bouton_produits
                         MDButton:
                             id: infos_shortcut
                             style: "tonal"
@@ -177,7 +183,7 @@ MDScreen:
                             width: "130dp"
                             on_release: app.ouvrir_onglet("infos")
                             MDButtonText:
-                                text: "NOS INFOS"
+                                text: app.accueil_bouton_infos
 
             MDScreen:
                 name: "produits"
@@ -209,7 +215,7 @@ MDScreen:
                         size_hint_y: None
                         height: self.minimum_height
                         MDLabel:
-                            text: "INFOS & ACTUALITÉS"
+                            text: app.infos_titre
                             halign: "center"
                             font_size: "30sp"
                             bold: True
@@ -223,7 +229,7 @@ MDScreen:
                     padding: "30dp"
                     spacing: "20dp"
                     MDLabel:
-                        text: "À PROPOS"
+                        text: app.apropos_titre
                         halign: "center"
                         font_size: "30sp"
                         bold: True
@@ -248,7 +254,7 @@ MDScreen:
                             size: "220dp", "220dp"
                             pos_hint: {"center_x": 0.5, "center_y": 0.5}
                     MDLabel:
-                        text: " Pour toutes informations sur notre entreprise, rendez-vous sur notre site Web officiel."
+                        text: app.apropos_description
                         halign: "center"
                         font_size: "18sp"
                         color: 1, 1, 1, 1
@@ -257,7 +263,7 @@ MDScreen:
                     Widget:
                         size_hint_y: 1
                     Button:
-                        text: "[u]SUPERLIFE-TOGO.COM[/u]"
+                        text: "[u]{}[/u]".format(app.apropos_lien_texte)
                         markup: True
                         color: 0.78, 0.91, 1, 1
                         bold: True
@@ -309,6 +315,19 @@ class VenteApp(MDApp):
     logo_available = BooleanProperty(False)
     owner_photo = StringProperty("")
     owner_photo_available = BooleanProperty(False)
+    accueil_titre = StringProperty("Bienvenue Chez SUPERLIFE TOGO!")
+    accueil_description = StringProperty(
+        "Découvrez nos produits et nos infos en exclusivités."
+    )
+    accueil_bouton_produits = StringProperty("PRODUITS")
+    accueil_bouton_infos = StringProperty("NOS INFOS")
+    infos_titre = StringProperty("INFOS & ACTUALITÉS")
+    apropos_titre = StringProperty("À PROPOS")
+    apropos_description = StringProperty(
+        " Pour toutes informations sur notre entreprise, rendez-vous sur "
+        "notre site Web officiel."
+    )
+    apropos_lien_texte = StringProperty("SUPERLIFE-TOGO.COM")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -317,6 +336,17 @@ class VenteApp(MDApp):
         self._home_logo_paths = []
         self._home_logo_index = 0
         self._home_logo_active_id = "logo_image"
+        self._home_logo_event = None
+        self._app_started = False
+
+    def _programmer_animation_logo(self):
+        if self._home_logo_event is not None:
+            self._home_logo_event.cancel()
+            self._home_logo_event = None
+        if self._app_started and len(self._home_logo_paths) > 1:
+            self._home_logo_event = Clock.schedule_interval(
+                self._animer_logo_suivant, 3
+            )
 
     def _animer_logo_suivant(self, _dt):
         if len(self._home_logo_paths) < 2 or self.root is None:
@@ -627,14 +657,100 @@ MDCard:
         blink.repeat = True
         blink.start(self.root.ids.produits_shortcut)
         blink.start(self.root.ids.infos_shortcut)
-        if len(self._home_logo_paths) > 1:
-            Clock.schedule_interval(self._animer_logo_suivant, 3)
+        self._app_started = True
+        self._programmer_animation_logo()
         if activity is not None:
             activity.bind(on_new_intent=self._on_new_intent)
         self._consommer_intention_notification()
 
     def on_resume(self):
         self._consommer_intention_notification()
+
+    def _charger_contenu_application(self):
+        content = obtenir_contenu_application()
+        home = content.get("accueil", {})
+        about = content.get("apropos", {})
+        images_dir = Path(__file__).resolve().parent / "images"
+        default_logos = [
+            images_dir / "logo.png",
+            images_dir / "logo1.png",
+            images_dir / "logo2.png",
+            images_dir / "logo3.png",
+        ]
+        logos = []
+        image_errors = []
+        for index, fallback in enumerate(default_logos, start=1):
+            reference = home.get("logo_{}".format(index), str(fallback))
+            try:
+                image_path = image_locale(reference, self.user_data_dir)
+            except FirebaseError as error:
+                image_path = ""
+                image_errors.append(str(error))
+            if image_path:
+                logos.append(image_path)
+            elif fallback.is_file():
+                logos.append(str(fallback))
+
+        photo_fallback = images_dir / "proprietaire.jpg"
+        photo_reference = about.get("photo", str(photo_fallback))
+        try:
+            photo = image_locale(photo_reference, self.user_data_dir)
+        except FirebaseError as error:
+            photo = ""
+            image_errors.append(str(error))
+        if not photo and photo_fallback.is_file():
+            photo = str(photo_fallback)
+
+        return {
+            "home": home,
+            "about": about,
+            "logos": logos,
+            "photo": photo,
+            "image_errors": image_errors,
+        }
+
+    def _appliquer_contenu_application(self, result):
+        home = result["home"]
+        about = result["about"]
+        self.accueil_titre = home.get(
+            "accueil_titre", "Bienvenue Chez SUPERLIFE TOGO!"
+        )
+        self.accueil_description = home.get(
+            "accueil_description",
+            "Découvrez nos produits et nos infos en exclusivités.",
+        )
+        self.accueil_bouton_produits = home.get(
+            "accueil_bouton_produits", "PRODUITS"
+        )
+        self.accueil_bouton_infos = home.get(
+            "accueil_bouton_infos", "NOS INFOS"
+        )
+        self.infos_titre = about.get("infos_titre", "INFOS & ACTUALITÉS")
+        self.apropos_titre = about.get("apropos_titre", "À PROPOS")
+        self.apropos_description = about.get(
+            "apropos_description",
+            " Pour toutes informations sur notre entreprise, rendez-vous "
+            "sur notre site Web officiel.",
+        )
+        self.apropos_lien_texte = about.get(
+            "apropos_lien_texte", "SUPERLIFE-TOGO.COM"
+        )
+
+        self._home_logo_paths = result["logos"]
+        self._programmer_animation_logo()
+        self.logo_available = bool(self._home_logo_paths)
+        if self.logo_available:
+            self._home_logo_index = 0
+            self._home_logo_active_id = "logo_image"
+            self.logo_image = self._home_logo_paths[0]
+            self.logo_next_image = (
+                self._home_logo_paths[1]
+                if len(self._home_logo_paths) > 1
+                else self._home_logo_paths[0]
+            )
+        self.owner_photo = result["photo"]
+        self.owner_photo_available = bool(self.owner_photo)
+        self._afficher_erreurs_images(result["image_errors"])
 
     def build(self):
         images_dir = Path(__file__).resolve().parent / "images"
@@ -660,6 +776,10 @@ MDCard:
             self.owner_photo = str(owner_photo)
         interface = Builder.load_string(KV)
         self.root = interface
+        self._executer_en_arriere_plan(
+            self._charger_contenu_application,
+            self._appliquer_contenu_application,
+        )
         self.afficher_produits()
         self.afficher_publications()
         return interface

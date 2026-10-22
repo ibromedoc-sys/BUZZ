@@ -61,6 +61,9 @@ textarea { resize: vertical; }
   align-items: start; gap: 22px; padding: 24px 0 50px; }
 .editor-card, .list-card { padding: 24px; border: 1px solid var(--border);
   border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.content-editor { gap: 11px; }
+.content-image-field { display: flex; flex-direction: column; gap: 9px;
+  padding: 14px; border: 1px solid #edf0ec; border-radius: 11px; }
 .card-heading { display: flex; align-items: center; justify-content: space-between;
   gap: 14px; margin-bottom: 22px; }
 .field-help { margin: -4px 0 2px; font-size: 11px; }

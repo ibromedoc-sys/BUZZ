@@ -20,11 +20,12 @@ passe ni credential de compte de service.
 Avec Firebase CLI déjà authentifié :
 
 ```sh
-firebase deploy --only hosting
+firebase deploy --only hosting,firestore:rules
 ```
 
-Héberger le tableau de bord en HTTPS via Firebase Hosting. Ne pas l'ouvrir
-directement depuis `file://` : les modules Firebase exigent un serveur Web.
+Héberger le tableau de bord en HTTPS via Firebase Hosting et publier les règles
+Firestore mises à jour. Ne pas l'ouvrir directement depuis `file://` : les
+modules Firebase exigent un serveur Web.
 
 ## Distribuer l'application et les mises à jour via Google Play
 
@@ -59,10 +60,19 @@ de celle installée par Play. Si Android refuse la première installation Play
 par-dessus, il faudra désinstaller l'ancienne APK puis installer l'application
 depuis la piste de test Play ; les données locales peuvent être effacées.
 
-Les lectures des collections `produits` et `publications` sont publiques pour
-les appareils clients. Seuls les jetons portant `admin: true` peuvent écrire
-dans Firestore. Le compte admin doit se déconnecter puis se reconnecter (ou
-renouveler son jeton) après modification de ses claims.
+Les lectures des collections `produits`, `publications` et `contenu` sont
+publiques pour les appareils clients. Seuls les jetons portant `admin: true`
+peuvent écrire dans Firestore. Le tableau de bord conserve les contenus fixes
+dans `contenu/accueil` (textes et quatre logos) et `contenu/apropos` (titre des
+actualités, textes de la page « À propos » et photo). Les valeurs initiales
+reproduisent celles de l'application ; les images locales existantes sont
+conservées tant qu'elles ne sont pas remplacées. L'application Android lit ces
+documents au démarrage et garde son contenu local si aucun document n'a encore
+été créé. Cette lecture à distance nécessite d'abord de publier une nouvelle
+version Android contenant cette fonctionnalité ; ensuite, modifier ces champs
+ne nécessite pas une nouvelle publication Android. Le compte admin doit se
+déconnecter puis se reconnecter (ou renouveler son jeton) après modification de
+ses claims.
 
 ## Hébergement d'images
 
@@ -71,9 +81,11 @@ cloud `jvljzrue` et le preset non signé `vente_images` (configuration Cloudinar
 existante, indépendante du projet Firebase BUZZ). Aucune clé secrète ni
 Firebase Storage n'est utilisé. Firestore conserve l'URL HTTPS `secure_url`
 renvoyée par Cloudinary dans le champ `image` des collections `produits` et
-`publications`. Une URL HTTPS saisie manuellement reste possible pour préserver
-le flux précédent. Lors d'une modification, ne pas choisir de fichier ni saisir
-d'URL conserve la référence actuelle, y compris les références locales historiques.
+`publications` et dans les champs d'image de `contenu/accueil` et
+`contenu/apropos`. Une URL HTTPS saisie manuellement reste possible pour
+préserver le flux précédent. Lors d'une modification, ne pas choisir de fichier
+ni saisir d'URL conserve la référence actuelle, y compris les références locales
+historiques.
 
 Les fichiers sont limités à JPEG, PNG ou WebP et à 5 Mo pour rester compatibles
 avec le client Android, qui lit les images HTTPS selon leur type MIME et les met
@@ -91,7 +103,10 @@ facturation ni déployer `storage.rules`.
 
 ## Vérification
 
-- Connexion avec l'administrateur : affichage des produits et publications.
+- Connexion avec l'administrateur : affichage des produits, publications et
+  des textes actuels de l'accueil et de la page « À propos ».
+- Modification des textes et des images de l'accueil/infos ; vérification de
+  leur affichage dans l'application Android après redémarrage.
 - Création, modification et suppression de chaque type dans Firestore.
 - Téléversement Cloudinary d'une image JPEG, PNG ou WebP et enregistrement de
   son URL HTTPS dans Firestore.

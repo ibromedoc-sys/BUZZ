@@ -35,10 +35,37 @@ const signOutButton = $("#sign-out");
 const productForm = $("#product-form");
 const publicationForm = $("#publication-form");
 const records = { produits: [], publications: [] };
+const defaultContent = {
+  accueil: {
+    accueil_titre: "Bienvenue Chez SUPERLIFE TOGO!",
+    accueil_description: "Découvrez nos produits et nos infos en exclusivités.",
+    accueil_bouton_produits: "PRODUITS",
+    accueil_bouton_infos: "NOS INFOS",
+    logo_1: "images/logo.png",
+    logo_2: "images/logo1.png",
+    logo_3: "images/logo2.png",
+    logo_4: "images/logo3.png",
+  },
+  apropos: {
+    infos_titre: "INFOS & ACTUALITÉS",
+    apropos_titre: "À PROPOS",
+    apropos_description:
+      " Pour toutes informations sur notre entreprise, rendez-vous sur notre site Web officiel.",
+    apropos_lien_texte: "SUPERLIFE-TOGO.COM",
+    photo: "images/proprietaire.jpg",
+  },
+};
+const content = {
+  accueil: { ...defaultContent.accueil },
+  apropos: { ...defaultContent.apropos },
+};
 let unsubscribeProducts;
 let unsubscribePublications;
+let unsubscribeHomeContent;
+let unsubscribeAboutContent;
 let noticeTimeout;
 const previewObjectUrls = new WeakMap();
+const contentPreviewObjectUrls = new WeakMap();
 
 function showNotice(message, kind = "error") {
   notice.textContent = message;
@@ -65,8 +92,12 @@ function setSignedIn(visible) {
 function stopListeners() {
   if (unsubscribeProducts) unsubscribeProducts();
   if (unsubscribePublications) unsubscribePublications();
+  if (unsubscribeHomeContent) unsubscribeHomeContent();
+  if (unsubscribeAboutContent) unsubscribeAboutContent();
   unsubscribeProducts = undefined;
   unsubscribePublications = undefined;
+  unsubscribeHomeContent = undefined;
+  unsubscribeAboutContent = undefined;
 }
 
 function watchRecords() {
@@ -93,7 +124,119 @@ function watchRecords() {
     },
     (error) => showNotice(friendlyError(error)),
   );
+  watchContent();
 }
+
+function setContentImagePreview(container, source, caption = "") {
+  const previousObjectUrl = contentPreviewObjectUrls.get(container);
+  if (previousObjectUrl) URL.revokeObjectURL(previousObjectUrl);
+
+  const image = container.querySelector("img");
+  const captionElement = container.querySelector("[data-content-caption]");
+  const previewUrl = imagePreviewUrl(source);
+  if (!source) {
+    image.removeAttribute("src");
+    captionElement.textContent = "";
+    container.classList.add("hidden");
+    contentPreviewObjectUrls.delete(container);
+    return;
+  }
+
+  if (previewUrl || source.startsWith("blob:")) image.src = source;
+  else image.removeAttribute("src");
+  captionElement.textContent = caption;
+  container.classList.remove("hidden");
+  if (source.startsWith("blob:")) contentPreviewObjectUrls.set(container, source);
+  else contentPreviewObjectUrls.delete(container);
+}
+
+function populateContentForm(section, data = null) {
+  content[section] = data
+    ? { ...defaultContent[section], ...data }
+    : { ...defaultContent[section] };
+  const form = section === "accueil"
+    ? $("#home-content-form") : $("#about-content-form");
+
+  for (const input of form.querySelectorAll("[data-content-text]")) {
+    input.value = content[section][input.name] ?? "";
+  }
+  for (const field of form.querySelectorAll("[data-content-image]")) {
+    const imageReference = content[section][field.dataset.contentImage] || "";
+    field.dataset.currentImage = imageReference;
+    setContentImagePreview(
+      field.querySelector("[data-content-preview]"),
+      imageReference,
+      imageReference ? `Image actuelle : ${imageReference}` : "",
+    );
+  }
+}
+
+function watchContent() {
+  unsubscribeHomeContent = onSnapshot(
+    doc(db, "contenu", "accueil"),
+    (snapshot) => populateContentForm(
+      "accueil", snapshot.exists() ? snapshot.data() : null,
+    ),
+    (error) => showNotice(friendlyError(error)),
+  );
+  unsubscribeAboutContent = onSnapshot(
+    doc(db, "contenu", "apropos"),
+    (snapshot) => populateContentForm(
+      "apropos", snapshot.exists() ? snapshot.data() : null,
+    ),
+    (error) => showNotice(friendlyError(error)),
+  );
+}
+
+async function saveContent(section, form, event) {
+  event.preventDefault();
+  const submitButton = form.querySelector('[type="submit"]');
+  submitButton.disabled = true;
+
+  try {
+    const values = { ...content[section] };
+    for (const input of form.querySelectorAll("[data-content-text]")) {
+      values[input.name] = input.value;
+    }
+    for (const field of form.querySelectorAll("[data-content-image]")) {
+      const imageName = field.dataset.contentImage;
+      const imageFile = form.elements[`file_${imageName}`].files[0] || null;
+      const enteredImageUrl =
+        form.elements[`url_${imageName}`].value.trim();
+      if (imageFile) validateImageFile(imageFile);
+      if (!imageFile && enteredImageUrl &&
+          !imagePreviewUrl(enteredImageUrl)) {
+        throw new Error("L’image doit être une URL HTTPS publique valide.");
+      }
+      values[imageName] = imageFile
+        ? await uploadImage(imageFile)
+        : enteredImageUrl || field.dataset.currentImage ||
+          defaultContent[section][imageName];
+    }
+
+    await setDoc(doc(db, "contenu", section), values, { merge: true });
+    content[section] = values;
+    for (const field of form.querySelectorAll("[data-content-image]")) {
+      const imageReference = values[field.dataset.contentImage];
+      field.dataset.currentImage = imageReference;
+      field.querySelector('input[type="file"]').value = "";
+      field.querySelector('input[type="url"]').value = "";
+      setContentImagePreview(
+        field.querySelector("[data-content-preview]"),
+        imageReference,
+        imageReference ? `Image actuelle : ${imageReference}` : "",
+      );
+    }
+    showNotice("Contenu enregistré.", "success");
+  } catch (error) {
+    showNotice(friendlyError(error));
+  } finally {
+    submitButton.disabled = false;
+  }
+}
+
+populateContentForm("accueil");
+populateContentForm("apropos");
 
 function escapeHtml(value = "") {
   return String(value).replace(/[&<>"']/g, (character) => ({
@@ -353,6 +496,10 @@ signOutButton.addEventListener("click", async () => {
 productForm.addEventListener("submit", (event) => saveRecord("produits", productForm, event));
 publicationForm.addEventListener("submit", (event) =>
   saveRecord("publications", publicationForm, event));
+$("#home-content-form").addEventListener("submit", (event) =>
+  saveContent("accueil", event.currentTarget, event));
+$("#about-content-form").addEventListener("submit", (event) =>
+  saveContent("apropos", event.currentTarget, event));
 
 for (const form of [productForm, publicationForm]) {
   const updateImagePreview = () => {
@@ -388,6 +535,47 @@ for (const form of [productForm, publicationForm]) {
       showNotice(friendlyError(error));
     }
   });
+}
+
+for (const form of [
+  $("#home-content-form"),
+  $("#about-content-form"),
+]) {
+  for (const field of form.querySelectorAll("[data-content-image]")) {
+    const preview = field.querySelector("[data-content-preview]");
+    const urlInput = field.querySelector('input[type="url"]');
+    const fileInput = field.querySelector('input[type="file"]');
+    urlInput.addEventListener("input", () => {
+      if (fileInput.files[0]) return;
+      const enteredUrl = imagePreviewUrl(urlInput.value.trim());
+      if (enteredUrl) {
+        setContentImagePreview(preview, enteredUrl, "Aperçu de l’URL");
+      } else {
+        setContentImagePreview(
+          preview,
+          field.dataset.currentImage,
+          field.dataset.currentImage
+            ? `Image actuelle : ${field.dataset.currentImage}` : "",
+        );
+      }
+    });
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      if (!file) {
+        urlInput.dispatchEvent(new Event("input"));
+        return;
+      }
+      try {
+        validateImageFile(file);
+        setContentImagePreview(
+          preview, URL.createObjectURL(file), file.name,
+        );
+      } catch (error) {
+        fileInput.value = "";
+        showNotice(friendlyError(error));
+      }
+    });
+  }
 }
 
 document.addEventListener("click", async (event) => {

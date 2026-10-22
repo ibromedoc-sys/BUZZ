@@ -188,6 +188,19 @@ def obtenir_publications():
     ]
 
 
+def obtenir_contenu_application():
+    """Return the editable static content documents used by the app."""
+    documents = _list_documents("contenu")
+    return {
+        _document_id(document): {
+            field_name: field.get("stringValue", "")
+            for field_name, field in document.get("fields", {}).items()
+            if "stringValue" in field
+        }
+        for document in documents
+    }
+
+
 def image_locale(image_reference, cache_directory):
     """Resolve bundled legacy images or download Firebase Storage images safely."""
     if not image_reference:
