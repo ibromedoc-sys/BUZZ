@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="google_app_id" translatable="false">1:609198798927:android:696e9df3f32e95011e123a</string>
-    <string name="gcm_defaultSenderId" translatable="false">609198798927</string>
-    <string name="google_api_key" translatable="false">AIzaSyCOLl2-1Mb311a9ZMmY0r4b7CJSXeXwHJU</string>
-    <string name="project_id" translatable="false">vente-24ed2</string>
+    <string name="google_app_id" translatable="false">1:509934305972:android:6910e4c6023dfe7e530de1</string>
+    <string name="gcm_defaultSenderId" translatable="false">509934305972</string>
+    <string name="google_api_key" translatable="false">AIzaSyB2JEosU5HLClY111x84N_V4kIAtUTHlqs</string>
+    <string name="project_id" translatable="false">buzz-6e997</string>
 </resources>

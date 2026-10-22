@@ -1,16 +1,16 @@
-# VENTE — tableau de bord administrateur
+# BUZZ — tableau de bord administrateur
 
 Le tableau de bord utilise Firebase Authentication et Firestore du projet
-`vente-24ed2`. Il n'initialise pas Firebase Storage et n'inclut aucun mot de
+`buzz-6e997`. Il n'initialise pas Firebase Storage et n'inclut aucun mot de
 passe ni credential de compte de service.
 
 ## Préparation Firebase
 
 1. Dans Firebase Console, activer le fournisseur **E-mail/Mot de passe** dans
    Authentication et vérifier que `ibromedoc@gmail.com` peut se connecter.
-2. Conserver la configuration existante de l'application Web dans
-   `web/firebase-config.js`. La clé API Firebase de configuration est publique ;
-   elle ne doit pas être confondue avec un credential de compte de service.
+2. La configuration Firebase est définie dans `web/firebase-config.js` pour le
+   projet BUZZ. La clé API Firebase de configuration est publique ; elle ne doit
+   pas être confondue avec un credential de compte de service.
 3. Vérifier la revendication personnalisée `admin: true` du compte admin. Les
    règles Firestore font autorité ; masquer l'interface n'est pas une
    protection des données.
@@ -28,12 +28,12 @@ directement depuis `file://` : les modules Firebase exigent un serveur Web.
 
 ## Distribuer l'application et les mises à jour via Google Play
 
-Les mises à jour de VENTE seront distribuées par Google Play ; l'application ne
+Les mises à jour de BUZZ seront distribuées par Google Play ; l'application ne
 vérifie plus un manifeste distant et ne télécharge ni n'installe d'APK depuis
 GitHub. Le fichier `web/app-update.json` et l'ancien mécanisme d'installation
 directe ne sont plus utilisés. Firebase Hosting reste dédié au tableau de bord.
 
-L'identifiant Android actuel est `com.vente.app` (`package.domain` +
+L'identifiant Android actuel est `com.buzz.app` (`package.domain` +
 `package.name` dans `buildozer.spec`) : il doit rester identique pour publier
 des mises à jour de la même application Play. Le format de sortie release est
 configuré en Android App Bundle (`aab`) ; le workflow GitHub Actions actuel
@@ -67,7 +67,8 @@ renouveler son jeton) après modification de ses claims.
 ## Hébergement d'images
 
 Le tableau de bord téléverse directement les images vers Cloudinary avec le
-cloud `jvljzrue` et le preset non signé `vente_images`. Aucune clé secrète ni
+cloud `jvljzrue` et le preset non signé `vente_images` (configuration Cloudinary
+existante, indépendante du projet Firebase BUZZ). Aucune clé secrète ni
 Firebase Storage n'est utilisé. Firestore conserve l'URL HTTPS `secure_url`
 renvoyée par Cloudinary dans le champ `image` des collections `produits` et
 `publications`. Une URL HTTPS saisie manuellement reste possible pour préserver

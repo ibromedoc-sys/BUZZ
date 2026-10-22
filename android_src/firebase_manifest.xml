@@ -1,5 +1,5 @@
 <service
-    android:name="com.vente.app.MyFirebaseMessagingService"
+    android:name="com.buzz.app.MyFirebaseMessagingService"
     android:exported="false">
     <intent-filter>
         <action android:name="com.google.firebase.MESSAGING_EVENT" />

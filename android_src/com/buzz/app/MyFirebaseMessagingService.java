@@ -1,4 +1,4 @@
-package com.vente.app;
+package com.buzz.app;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -13,12 +13,12 @@ import com.google.firebase.messaging.RemoteMessage;
 
 public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
-    private static final String CHANNEL_ID = "vente_notifications";
+    private static final String CHANNEL_ID = "buzz_notifications";
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
 
-        String title = "VENTE";
+        String title = "BUZZ";
         String body = "Nouvelle annonce disponible";
         String annonceId = "";
 
@@ -55,7 +55,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "Notifications VENTE",
+                    "Notifications BUZZ",
                     NotificationManager.IMPORTANCE_HIGH
             );
             manager.createNotificationChannel(channel);
@@ -79,6 +79,6 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     @Override
     public void onNewToken(String token) {
         super.onNewToken(token);
-        android.util.Log.d("VENTE_FCM", "TOKEN=" + token);
+        android.util.Log.d("BUZZ_FCM", "TOKEN=" + token);
     }
 }

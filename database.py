@@ -1,4 +1,4 @@
-"""Read-only Firebase data access for the VENTE Android application."""
+"""Read-only Firebase data access for the BUZZ Android application."""
 
 import hashlib
 import json
@@ -43,9 +43,9 @@ def _firebase_config():
                 "Configuration Firebase invalide ou fichier google-services.json absent."
             ) from error
 
-        if package_name != "com.vente.app":
+        if package_name != "com.buzz.app":
             raise FirebaseError(
-                "google-services.json ne correspond pas au package com.vente.app."
+                "google-services.json ne correspond pas au package com.buzz.app."
             )
 
         _FIREBASE_CONFIG = {

@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "609198798927",
-    "project_id": "vente-24ed2",
-    "storage_bucket": "vente-24ed2.firebasestorage.app"
+    "project_number": "509934305972",
+    "project_id": "buzz-6e997",
+    "storage_bucket": "buzz-6e997.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:609198798927:android:696e9df3f32e95011e123a",
+        "mobilesdk_app_id": "1:509934305972:android:6910e4c6023dfe7e530de1",
         "android_client_info": {
-          "package_name": "com.vente.app"
+          "package_name": "com.buzz.app"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCOLl2-1Mb311a9ZMmY0r4b7CJSXeXwHJU"
+          "current_key": "AIzaSyB2JEosU5HLClY111x84N_V4kIAtUTHlqs"
         }
       ],
       "services": {

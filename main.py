@@ -94,7 +94,7 @@ MDScreen:
         pos: root.pos
 
         MDTopAppBar:
-            title: "VENTE"
+            title: "BUZZ"
 
         MDScreenManager:
             id: screen_manager
@@ -142,7 +142,7 @@ MDScreen:
                                 fit_mode: "contain"
                                 size_hint: 1, 1
                         MDLabel:
-                            text: "VENTE"
+                            text: "BUZZ"
                             halign: "center"
                             font_size: "22sp"
                             bold: True

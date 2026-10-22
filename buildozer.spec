@@ -1,8 +1,8 @@
 [app]
 
-title = VENTE
+title = BUZZ
 package.name = app
-package.domain = com.vente
+package.domain = com.buzz
 
 source.dir = .
 source.include_exts = py,png,jpg,jpeg,webp,kv,atlas,json
