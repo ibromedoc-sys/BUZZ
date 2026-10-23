@@ -75,7 +75,7 @@ def _ssl_context():
     return ssl.create_default_context(cafile=certifi.where())
 
 
-def _request_json(url):
+def _request_json(url, not_found_ok=False):
     request = Request(url, headers={"Accept": "application/json"}, method="GET")
 
     try:
@@ -84,6 +84,8 @@ def _request_json(url):
         ) as response:
             return _decode_response(response.read())
     except HTTPError as error:
+        if error.code == 404 and not_found_ok:
+            return None
         response_data = _decode_response(error.read())
         message = response_data.get("error", {}).get("message")
         if error.code in (401, 403):
@@ -102,6 +104,17 @@ def _firestore_collection_url(collection):
     url = (
         "https://firestore.googleapis.com/v1/projects/{}/databases/(default)"
         "/documents/{}".format(config["project_id"], collection)
+    )
+    return "{}?{}".format(url, urlencode({"key": config["api_key"]}))
+
+
+def _firestore_document_url(collection, document_id):
+    config = _firebase_config()
+    url = (
+        "https://firestore.googleapis.com/v1/projects/{}/databases/(default)"
+        "/documents/{}/{}".format(
+            config["project_id"], collection, document_id
+        )
     )
     return "{}?{}".format(url, urlencode({"key": config["api_key"]}))
 
@@ -205,6 +218,15 @@ def obtenir_contenu_application():
         }
         for document in documents
     }
+
+
+def obtenir_revision_tableau():
+    """Return the Firestore update time for the dashboard change marker."""
+    document = _request_json(
+        _firestore_document_url("metadata", "dashboard"),
+        not_found_ok=True,
+    )
+    return document.get("updateTime") if document else None
 
 
 def image_locale(image_reference, cache_directory):

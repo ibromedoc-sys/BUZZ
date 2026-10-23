@@ -224,6 +224,7 @@ async function saveContent(section, form, event) {
     }
 
     await setDoc(doc(db, "contenu", section), values, { merge: true });
+    await signalerModificationTableau();
     content[section] = values;
     for (const field of form.querySelectorAll("[data-content-image]")) {
       const imageReference = values[field.dataset.contentImage];
@@ -384,6 +385,18 @@ function recordIdFor(form) {
   return form.elements.id.value || crypto.randomUUID();
 }
 
+async function signalerModificationTableau() {
+  try {
+    await setDoc(doc(db, "metadata", "dashboard"), {
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    throw new Error(
+      `Modification enregistrée, mais l’indicateur de mise à jour a échoué : ${friendlyError(error)}`,
+    );
+  }
+}
+
 async function saveRecord(type, form, event) {
   event.preventDefault();
   const isProduct = type === "produits";
@@ -429,12 +442,15 @@ async function saveRecord(type, form, event) {
     const collectionRef = collection(db, type);
     if (existingId) {
       await updateDoc(doc(collectionRef, existingId), values);
-      showNotice("Modifications enregistrées.", "success");
     } else {
       if (type === "publications") values._createdAt = serverTimestamp();
       await setDoc(doc(collectionRef, recordId), values);
-      showNotice("Élément ajouté.", "success");
     }
+    await signalerModificationTableau();
+    showNotice(
+      existingId ? "Modifications enregistrées." : "Élément ajouté.",
+      "success",
+    );
     resetForm(form);
   } catch (error) {
     showNotice(friendlyError(error));
@@ -485,6 +501,7 @@ async function deleteRecord(type, id) {
   if (!item || !window.confirm(`Supprimer « ${recordTitle(type, item)} » ?`)) return;
   try {
     await deleteDoc(doc(db, type, id));
+    await signalerModificationTableau();
     showNotice("Élément supprimé.", "success");
   } catch (error) {
     showNotice(friendlyError(error));

@@ -26,6 +26,7 @@ from database import (
     obtenir_contenu_application,
     obtenir_produits,
     obtenir_publications,
+    obtenir_revision_tableau,
 )
 
 from kivy.uix.popup import Popup
@@ -42,7 +43,6 @@ except ImportError:
 
 
 ANDROID_NOTIFICATION_PERMISSION = "android.permission.POST_NOTIFICATIONS"
-BACKGROUND_CLOSE_DELAY_MS = 30_000
 
 
 class BaseNavigationItem(MDNavigationItem):
@@ -116,83 +116,87 @@ MDScreen:
 
             MDScreen:
                 name: "accueil"
-                GradientBackground:
-                    orientation: "vertical"
-                    padding: ["30dp", "10dp", "30dp", "30dp"]
-                    spacing: "12dp"
-                    MDLabel:
-                        text: app.accueil_titre
-                        halign: "center"
-                        font_size: "30sp"
-                        bold: True
-                        color: 1, 1, 1, 1
-                        size_hint_y: None
-                        height: "55dp"
-                    AnimatedLogo:
-                        id: home_logo
+                ScrollView:
+                    do_scroll_x: False
+                    bar_width: "3dp"
+                    GradientBackground:
                         orientation: "vertical"
                         size_hint_y: None
-                        height: "170dp"
-                        spacing: "5dp"
-                        MDIcon:
-                            id: logo_icon
-                            icon: "storefront"
-                            font_size: "92sp"
-                            theme_text_color: "Custom"
-                            text_color: 1, 1, 1, 1
-                            opacity: 0 if app.logo_available else 1
-                        RelativeLayout:
-                            size_hint_y: None
-                            height: "120dp"
-                            Image:
-                                id: logo_image
-                                source: app.logo_image
-                                opacity: 1 if app.logo_available else 0
-                                fit_mode: "contain"
-                                size_hint: 1, 1
-                            Image:
-                                id: logo_image_next
-                                source: app.logo_next_image
-                                opacity: 0
-                                fit_mode: "contain"
-                                size_hint: 1, 1
+                        height: max(self.minimum_height, self.parent.height)
+                        padding: ["20dp", "16dp", "20dp", "20dp"]
+                        spacing: "12dp"
                         MDLabel:
-                            text: "BUZZ"
+                            text: app.accueil_titre
                             halign: "center"
-                            font_size: "22sp"
+                            text_size: self.width, None
+                            font_size: "30sp"
                             bold: True
                             color: 1, 1, 1, 1
-                            opacity: 0 if app.logo_available else 1
-                    MDLabel:
-                        text: app.accueil_description
-                        halign: "center"
-                        font_size: "18sp"
-                        color: 1, 1, 1, 1
-                        size_hint_y: None
-                        height: "60dp"
-                    MDBoxLayout:
-                        orientation: "horizontal"
-                        size_hint: None, None
-                        width: "272dp"
-                        height: "48dp"
-                        spacing: "12dp"
-                        pos_hint: {"center_x": 0.5}
-                        MDButton:
-                            id: produits_shortcut
-                            style: "tonal"
-                            size_hint_x: None
-                            width: "130dp"
-                            on_release: app.ouvrir_onglet("produits")
-                            MDButtonText:
-                                text: app.accueil_bouton_produits
-                        MDButton:
-                            id: infos_shortcut
-                            style: "tonal"
-                            size_hint_x: None
-                            width: "130dp"
-                            on_release: app.ouvrir_onglet("infos")
-                            MDButtonText:
-                                text: app.accueil_bouton_infos
+                            size_hint_y: None
+                            height: self.texture_size[1] + dp(8)
+                        AnimatedLogo:
+                            id: home_logo
+                            orientation: "vertical"
+                            size_hint_y: None
+                            height: "170dp"
+                            spacing: "5dp"
+                            MDIcon:
+                                id: logo_icon
+                                icon: "storefront"
+                                font_size: "92sp"
+                                theme_text_color: "Custom"
+                                text_color: 1, 1, 1, 1
+                                opacity: 0 if app.logo_available else 1
+                            RelativeLayout:
+                                size_hint_y: None
+                                height: "120dp"
+                                Image:
+                                    id: logo_image
+                                    source: app.logo_image
+                                    opacity: 1 if app.logo_available else 0
+                                    fit_mode: "contain"
+                                    size_hint: 1, 1
+                                Image:
+                                    id: logo_image_next
+                                    source: app.logo_next_image
+                                    opacity: 0
+                                    fit_mode: "contain"
+                                    size_hint: 1, 1
+                            MDLabel:
+                                text: "BUZZ"
+                                halign: "center"
+                                font_size: "22sp"
+                                bold: True
+                                color: 1, 1, 1, 1
+                                opacity: 0 if app.logo_available else 1
+                        MDLabel:
+                            text: app.accueil_description
+                            halign: "center"
+                            text_size: self.width, None
+                            font_size: "18sp"
+                            color: 1, 1, 1, 1
+                            size_hint_y: None
+                            height: max(dp(60), self.texture_size[1] + dp(8))
+                        MDBoxLayout:
+                            orientation: "horizontal"
+                            size_hint_x: 1
+                            size_hint_y: None
+                            height: "48dp"
+                            spacing: "12dp"
+                            MDButton:
+                                id: produits_shortcut
+                                style: "tonal"
+                                size_hint_x: 1
+                                on_release: app.ouvrir_onglet("produits")
+                                MDButtonText:
+                                    text: app.accueil_bouton_produits
+                            MDButton:
+                                id: infos_shortcut
+                                style: "tonal"
+                                size_hint_x: 1
+                                on_release: app.ouvrir_onglet("infos")
+                                MDButtonText:
+                                    text: app.accueil_bouton_infos
 
             MDScreen:
                 name: "produits"
@@ -233,55 +237,61 @@ MDScreen:
 
             MDScreen:
                 name: "apropos"
-                GradientBackground:
-                    orientation: "vertical"
-                    padding: "30dp"
-                    spacing: "20dp"
-                    MDLabel:
-                        text: app.apropos_titre
-                        halign: "center"
-                        font_size: "30sp"
-                        bold: True
-                        color: 1, 1, 1, 1
+                ScrollView:
+                    do_scroll_x: False
+                    bar_width: "3dp"
+                    GradientBackground:
+                        orientation: "vertical"
                         size_hint_y: None
-                        height: "55dp"
-                    FloatLayout:
-                        size_hint_y: None
-                        height: "240dp"
-                        MDIcon:
-                            icon: "account-circle"
-                            font_size: "150sp"
-                            theme_text_color: "Custom"
-                            text_color: 0.75, 0.8, 0.88, 1
-                            opacity: 0 if app.owner_photo_available else 1
-                            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-                        Image:
-                            source: app.owner_photo
-                            opacity: 1 if app.owner_photo_available else 0
-                            fit_mode: "contain"
-                            size_hint: None, None
-                            size: "220dp", "220dp"
-                            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-                    MDLabel:
-                        text: app.apropos_description
-                        halign: "center"
-                        font_size: "18sp"
-                        color: 1, 1, 1, 1
-                        size_hint_y: None
-                        height: "90dp"
-                    Widget:
-                        size_hint_y: 1
-                    Button:
-                        text: "[u]{}[/u]".format(app.apropos_lien_texte)
-                        markup: True
-                        color: 0.78, 0.91, 1, 1
-                        bold: True
-                        font_size: "18sp"
-                        background_normal: ""
-                        background_color: 0, 0, 0, 0
-                        size_hint_y: None
-                        height: "48dp"
-                        on_release: app.ouvrir_site()
+                        height: max(self.minimum_height, self.parent.height)
+                        padding: "20dp"
+                        spacing: "20dp"
+                        MDLabel:
+                            text: app.apropos_titre
+                            halign: "center"
+                            text_size: self.width, None
+                            font_size: "30sp"
+                            bold: True
+                            color: 1, 1, 1, 1
+                            size_hint_y: None
+                            height: self.texture_size[1] + dp(8)
+                        FloatLayout:
+                            size_hint_y: None
+                            height: "240dp"
+                            MDIcon:
+                                icon: "account-circle"
+                                font_size: "150sp"
+                                theme_text_color: "Custom"
+                                text_color: 0.75, 0.8, 0.88, 1
+                                opacity: 0 if app.owner_photo_available else 1
+                                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                            Image:
+                                source: app.owner_photo
+                                opacity: 1 if app.owner_photo_available else 0
+                                fit_mode: "contain"
+                                size_hint: None, None
+                                size: "220dp", "220dp"
+                                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                        MDLabel:
+                            text: app.apropos_description
+                            halign: "center"
+                            text_size: self.width, None
+                            font_size: "18sp"
+                            color: 1, 1, 1, 1
+                            size_hint_y: None
+                            height: max(dp(90), self.texture_size[1] + dp(8))
+                        Button:
+                            text: "[u]{}[/u]".format(app.apropos_lien_texte)
+                            markup: True
+                            color: 0.78, 0.91, 1, 1
+                            bold: True
+                            font_size: "18sp"
+                            background_normal: ""
+                            background_color: 0, 0, 0, 0
+                            text_size: self.width, None
+                            size_hint_y: None
+                            height: max(dp(48), self.texture_size[1] + dp(16))
+                            on_release: app.ouvrir_site()
 
         MDNavigationBar:
             id: navigation_bar
@@ -348,8 +358,8 @@ class VenteApp(MDApp):
         self._home_logo_active_id = "logo_image"
         self._home_logo_event = None
         self._app_started = False
-        self._background_close_handler = None
-        self._background_close_runnable = None
+        self._revision_tableau = None
+        self._revision_tableau_initialisee = False
 
     def _programmer_animation_logo(self):
         if self._home_logo_event is not None:
@@ -512,7 +522,7 @@ MDLabel:
 MDCard:
     orientation: "vertical"
     size_hint_y: None
-    height: "400dp"
+    height: self.minimum_height
     padding: "10dp"
     spacing: "10dp"
     elevation: 3
@@ -525,24 +535,29 @@ MDCard:
         font_size: "22sp"
         bold: True
         halign: "center"
+        text_size: self.width, None
         size_hint_y: None
-        height: "40dp"
+        height: max(dp(40), self.texture_size[1] + dp(8))
     MDLabel:
         text: "{}"
         font_size: "20sp"
         halign: "center"
+        text_size: self.width, None
         size_hint_y: None
-        height: "40dp"
+        height: max(dp(40), self.texture_size[1] + dp(8))
     MDLabel:
         text: "{}"
         halign: "center"
+        text_size: self.width, None
         size_hint_y: None
-        height: "50dp"
+        height: max(dp(50), self.texture_size[1] + dp(8))
     MDButton:
         style: "filled"
         pos_hint: {{"center_x": 0.5}}
         size_hint_x: None
+        size_hint_y: None
         width: "220dp"
+        height: "48dp"
         on_release: app.commander_whatsapp("{}", "{}", "{}")
         MDButtonIcon:
             icon: "whatsapp"
@@ -655,18 +670,19 @@ MDCard:
                 activity_class = autoclass("org.kivy.android.PythonActivity")
                 intent = activity_class.mActivity.getIntent()
             except (ImportError, AttributeError, RuntimeError):
-                return
+                return False
         try:
             publication_id = intent.getStringExtra("annonce_id")
         except (AttributeError, RuntimeError):
-            return
+            return False
         if not publication_id:
-            return
+            return False
         try:
             intent.removeExtra("annonce_id")
         except (AttributeError, RuntimeError):
             pass
         self.afficher_publications(publication_id)
+        return True
 
     def _on_new_intent(self, *args):
         for value in reversed(args):
@@ -711,55 +727,66 @@ MDCard:
             request_permissions([ANDROID_NOTIFICATION_PERMISSION])
 
     def on_pause(self):
-        if activity is None:
-            return True
-        try:
-            from jnius import JavaException, PythonJavaClass, autoclass, java_method
-        except ImportError as error:
-            Logger.exception(
-                "BUZZ: impossible de charger Pyjnius pour la fermeture en "
-                "arrière-plan: " + str(error)
-            )
-            return True
-
-        try:
-            app_activity = autoclass("org.kivy.android.PythonActivity").mActivity
-            handler_class = autoclass("android.os.Handler")
-            looper_class = autoclass("android.os.Looper")
-            self._background_close_handler = handler_class(
-                looper_class.getMainLooper()
-            )
-
-            class CloseAppTask(PythonJavaClass):
-                __javainterfaces__ = ["java/lang/Runnable"]
-                __javacontext__ = "app"
-
-                @java_method("()V")
-                def run(task):
-                    app_activity.finishAndRemoveTask()
-
-            self._background_close_runnable = CloseAppTask()
-            self._background_close_handler.postDelayed(
-                self._background_close_runnable, BACKGROUND_CLOSE_DELAY_MS
-            )
-        except (AttributeError, RuntimeError, JavaException) as error:
-            Logger.exception(
-                "BUZZ: impossible de programmer la fermeture en arrière-plan: "
-                + str(error)
-            )
         return True
 
-    def on_resume(self):
-        if (
-            self._background_close_handler is not None
-            and self._background_close_runnable is not None
-        ):
-            self._background_close_handler.removeCallbacks(
-                self._background_close_runnable
+    def _connexion_internet_disponible(self):
+        if activity is None:
+            return True
+
+        try:
+            from jnius import JavaException, autoclass
+
+            app_activity = autoclass(
+                "org.kivy.android.PythonActivity"
+            ).mActivity
+            connectivity_manager = app_activity.getSystemService("connectivity")
+            network = connectivity_manager.getActiveNetwork()
+            if network is None:
+                return False
+
+            capabilities = connectivity_manager.getNetworkCapabilities(network)
+            if capabilities is None:
+                return False
+
+            network_capabilities = autoclass("android.net.NetworkCapabilities")
+            return capabilities.hasCapability(
+                network_capabilities.NET_CAPABILITY_VALIDATED
             )
-            self._background_close_handler = None
-            self._background_close_runnable = None
-        self._consommer_intention_notification()
+        except (ImportError, AttributeError, RuntimeError, JavaException) as error:
+            Logger.exception(
+                "BUZZ: impossible de vérifier la connexion Internet: "
+                + str(error)
+            )
+            return False
+
+    def on_resume(self):
+        if not self._connexion_internet_disponible():
+            return
+
+        self._executer_en_arriere_plan(
+            obtenir_revision_tableau,
+            self._actualiser_si_revision_modifiee,
+        )
+
+    def _memoriser_revision_tableau(self, revision):
+        self._revision_tableau = revision
+        self._revision_tableau_initialisee = True
+
+    def _actualiser_si_revision_modifiee(self, revision):
+        if not self._revision_tableau_initialisee:
+            self._memoriser_revision_tableau(revision)
+            return
+        if revision == self._revision_tableau:
+            return
+
+        self._memoriser_revision_tableau(revision)
+        self._executer_en_arriere_plan(
+            self._charger_contenu_application,
+            self._appliquer_contenu_application,
+        )
+        self.afficher_produits()
+        if not self._consommer_intention_notification():
+            self.afficher_publications()
 
     def _charger_contenu_application(self):
         content = obtenir_contenu_application()
@@ -874,6 +901,10 @@ MDCard:
             self.owner_photo = str(owner_photo)
         interface = Builder.load_string(KV)
         self.root = interface
+        self._executer_en_arriere_plan(
+            obtenir_revision_tableau,
+            self._memoriser_revision_tableau,
+        )
         self._executer_en_arriere_plan(
             self._charger_contenu_application,
             self._appliquer_contenu_application,

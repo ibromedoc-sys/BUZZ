@@ -23,7 +23,7 @@ android.minapi = 24
 android.ndk_api = 24
 android.archs = arm64-v8a
 
-android.permissions = INTERNET,POST_NOTIFICATIONS
+android.permissions = INTERNET,ACCESS_NETWORK_STATE,POST_NOTIFICATIONS
 android.enable_androidx = True
 android.gradle_dependencies = com.google.firebase:firebase-messaging:24.1.2
 android.add_src = %(source.dir)s/android_src

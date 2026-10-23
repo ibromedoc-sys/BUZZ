@@ -109,10 +109,31 @@ désactiver l'écrasement si possible et surveiller les quotas. Ne jamais ajoute
 de secret Cloudinary au client. Ne pas activer Firebase Storage, modifier la
 facturation ni déployer `storage.rules`.
 
+Le tableau de bord met à jour `metadata/dashboard` après chaque création,
+modification ou suppression de produit/publication et après chaque
+enregistrement de contenu. Ce document sert uniquement d'indicateur de
+changement. Au retour de l'application Android au premier plan, celle-ci le
+compare à la dernière version connue et ne recharge ses onglets que s'il a
+changé et si Android confirme une connexion Internet. Sans connexion, ou si
+rien n'a changé, les onglets et les données affichées restent intacts. Android
+pouvant suspendre l'application, la vérification se fait à son retour, pas
+pendant cette suspension.
+
+La lecture publique et l'écriture admin de `metadata` sont définies dans
+`firestore.rules`. Déployer les règles avec Firebase CLI après leur modification
+(`firebase deploy --only firestore:rules`) et publier la nouvelle version du
+tableau de bord. Reconstruire et installer l'application Android pour activer
+la vérification conditionnelle.
+
 ## Vérification
 
 - Connexion avec l'administrateur : affichage des produits, publications et
   des textes actuels de l'accueil et de la page « À propos ».
+- Application Android hors connexion lors de sa reprise : aucune requête
+  d'actualisation ; rétablir Internet puis revenir dans l'application.
+- Application avec Internet : reprendre sans modification du tableau de bord
+  (les onglets ne sont pas rechargés), puis modifier un contenu et reprendre à
+  nouveau (les onglets sont rechargés).
 - Modification des textes et des images de l'accueil/infos ; vérification de
   leur affichage dans l'application Android après redémarrage.
 - Création, modification et suppression de chaque type dans Firestore.
