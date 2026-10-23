@@ -409,17 +409,19 @@ class VenteApp(MDApp):
             height="180dp",
         ).open()
 
-    def _charger_avec_images(self, collection_loader):
+    def _charger_avec_images(self, collection_loader, image_index=-1):
         records = collection_loader()
         rows = []
         image_errors = []
         for row in records:
             try:
-                local_image = image_locale(row[-1], self.user_data_dir)
+                local_image = image_locale(row[image_index], self.user_data_dir)
             except FirebaseError as error:
                 local_image = ""
                 image_errors.append(str(error))
-            rows.append((*row[:-1], local_image))
+            resolved_row = list(row)
+            resolved_row[image_index] = local_image
+            rows.append(tuple(resolved_row))
         return rows, image_errors
 
     def _afficher_erreurs_images(self, image_errors):
@@ -472,7 +474,7 @@ class VenteApp(MDApp):
 
     def afficher_produits(self):
         self._executer_en_arriere_plan(
-            lambda: self._charger_avec_images(obtenir_produits),
+            lambda: self._charger_avec_images(obtenir_produits, image_index=-2),
             self._afficher_produits,
         )
 
