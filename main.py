@@ -10,6 +10,7 @@ from kivy.lang import Builder
 from kivy.properties import BooleanProperty, NumericProperty, StringProperty
 from kivy.graphics import Color, Rectangle
 from kivy.graphics.texture import Texture
+from kivy.logger import Logger
 from kivy.metrics import dp
 from kivymd.app import MDApp
 from kivymd.uix.navigationbar import (
@@ -33,8 +34,15 @@ from kivy.uix.label import Label as KivyLabel
 
 try:
     from android import activity
+    from android.permissions import check_permission, request_permissions
 except ImportError:
     activity = None
+    check_permission = None
+    request_permissions = None
+
+
+ANDROID_NOTIFICATION_PERMISSION = "android.permission.POST_NOTIFICATIONS"
+BACKGROUND_CLOSE_DELAY_MS = 30_000
 
 
 class BaseNavigationItem(MDNavigationItem):
@@ -340,6 +348,8 @@ class VenteApp(MDApp):
         self._home_logo_active_id = "logo_image"
         self._home_logo_event = None
         self._app_started = False
+        self._background_close_handler = None
+        self._background_close_runnable = None
 
     def _programmer_animation_logo(self):
         if self._home_logo_event is not None:
@@ -683,9 +693,72 @@ MDCard:
         self._programmer_animation_logo()
         if activity is not None:
             activity.bind(on_new_intent=self._on_new_intent)
+        self._demander_permission_notifications()
         self._consommer_intention_notification()
 
+    def _demander_permission_notifications(self):
+        if (
+            activity is None
+            or check_permission is None
+            or request_permissions is None
+        ):
+            return
+        from jnius import autoclass
+
+        if autoclass("android.os.Build$VERSION").SDK_INT < 33:
+            return
+        if not check_permission(ANDROID_NOTIFICATION_PERMISSION):
+            request_permissions([ANDROID_NOTIFICATION_PERMISSION])
+
+    def on_pause(self):
+        if activity is None:
+            return True
+        try:
+            from jnius import JavaException, PythonJavaClass, autoclass, java_method
+        except ImportError as error:
+            Logger.exception(
+                "BUZZ: impossible de charger Pyjnius pour la fermeture en "
+                "arrière-plan: " + str(error)
+            )
+            return True
+
+        try:
+            app_activity = autoclass("org.kivy.android.PythonActivity").mActivity
+            handler_class = autoclass("android.os.Handler")
+            looper_class = autoclass("android.os.Looper")
+            self._background_close_handler = handler_class(
+                looper_class.getMainLooper()
+            )
+
+            class CloseAppTask(PythonJavaClass):
+                __javainterfaces__ = ["java/lang/Runnable"]
+                __javacontext__ = "app"
+
+                @java_method("()V")
+                def run(task):
+                    app_activity.finishAndRemoveTask()
+
+            self._background_close_runnable = CloseAppTask()
+            self._background_close_handler.postDelayed(
+                self._background_close_runnable, BACKGROUND_CLOSE_DELAY_MS
+            )
+        except (AttributeError, RuntimeError, JavaException) as error:
+            Logger.exception(
+                "BUZZ: impossible de programmer la fermeture en arrière-plan: "
+                + str(error)
+            )
+        return True
+
     def on_resume(self):
+        if (
+            self._background_close_handler is not None
+            and self._background_close_runnable is not None
+        ):
+            self._background_close_handler.removeCallbacks(
+                self._background_close_runnable
+            )
+            self._background_close_handler = None
+            self._background_close_runnable = None
         self._consommer_intention_notification()
 
     def _charger_contenu_application(self):
