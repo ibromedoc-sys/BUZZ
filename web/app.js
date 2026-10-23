@@ -22,6 +22,7 @@ const CLOUDINARY_CLOUD_NAME = "jvljzrue";
 const CLOUDINARY_UPLOAD_PRESET = "vente_images";
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const DEFAULT_ORDER_PHONE = "22899057931";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -52,6 +53,7 @@ const defaultContent = {
     apropos_description:
       " Pour toutes informations sur notre entreprise, rendez-vous sur notre site Web officiel.",
     apropos_lien_texte: "SUPERLIFE-TOGO.COM",
+    apropos_lien_url: "https://superlife-togo.com",
     photo: "images/proprietaire.jpg",
   },
 };
@@ -198,6 +200,13 @@ async function saveContent(section, form, event) {
     for (const input of form.querySelectorAll("[data-content-text]")) {
       values[input.name] = input.value;
     }
+    if (section === "apropos") {
+      const websiteUrl = imagePreviewUrl(values.apropos_lien_url.trim());
+      if (!websiteUrl) {
+        throw new Error("La destination du lien doit être une URL HTTPS valide.");
+      }
+      values.apropos_lien_url = websiteUrl;
+    }
     for (const field of form.querySelectorAll("[data-content-image]")) {
       const imageName = field.dataset.contentImage;
       const imageFile = form.elements[`file_${imageName}`].files[0] || null;
@@ -343,7 +352,10 @@ function renderRecords(type) {
   for (const item of sorted) {
     const row = document.createElement("article");
     row.className = "record";
-    const secondary = isProduct ? item.prix || "" : item.date || "";
+    const secondary = isProduct
+      ? [item.prix || "", item.telephone_commande || DEFAULT_ORDER_PHONE]
+        .filter(Boolean).join(" · ")
+      : item.date || "";
     const imageUrl = imagePreviewUrl(item.image || "");
     row.innerHTML = `
       ${imageUrl ? `<img class="record-image" src="${escapeHtml(imageUrl)}" alt="">` :
@@ -390,6 +402,7 @@ async function saveRecord(type, form, event) {
           nom: String(formData.get("nom")).trim(),
           prix: String(formData.get("prix")).trim(),
           description: String(formData.get("description")).trim(),
+          telephone_commande: String(formData.get("telephone_commande")).trim(),
         }
       : {
           titre: String(formData.get("titre")).trim(),
@@ -398,6 +411,12 @@ async function saveRecord(type, form, event) {
         };
     if (!values[isProduct ? "nom" : "titre"]) {
       throw new Error(isProduct ? "Le nom est obligatoire." : "Le titre est obligatoire.");
+    }
+    if (isProduct) {
+      const phoneDigits = values.telephone_commande.replace(/\D/g, "");
+      if (phoneDigits.length < 8 || phoneDigits.length > 15) {
+        throw new Error("Saisissez un numéro WhatsApp international valide (8 à 15 chiffres).");
+      }
     }
     if (imageFile) validateImageFile(imageFile);
     if (!imageFile && enteredImageUrl && !imagePreviewUrl(enteredImageUrl)) {
@@ -428,7 +447,7 @@ function resetForm(form) {
   setImagePreview(form, "");
   form.reset();
   form.elements.id.value = "";
-  $(`#${form.id}-title`).textContent = form === productForm
+  $(`#${form.getAttribute("id")}-title`).textContent = form === productForm
     ? "Ajouter un produit" : "Ajouter une publication";
   form.querySelector('[data-cancel]')?.classList.add("hidden");
 }
@@ -448,6 +467,8 @@ function editRecord(type, id) {
     form.elements.nom.value = item.nom || "";
     form.elements.prix.value = item.prix || "";
     form.elements.description.value = item.description || "";
+    form.elements.telephone_commande.value =
+      item.telephone_commande || DEFAULT_ORDER_PHONE;
     $("#product-form-title").textContent = "Modifier le produit";
   } else {
     form.elements.titre.value = item.titre || "";

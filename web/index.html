@@ -75,6 +75,13 @@
               <label for="product-description">Description</label>
               <textarea id="product-description" name="description"
                         rows="4" maxlength="2000"></textarea>
+              <label for="product-order-phone">Téléphone pour les commandes WhatsApp</label>
+              <input id="product-order-phone" name="telephone_commande"
+                     type="tel" maxlength="25" inputmode="tel"
+                     value="22899057931" required>
+              <p class="field-help">
+                Saisissez l’indicatif du pays, par exemple +228 90 57 93 1.
+              </p>
               <label for="product-image-url">URL HTTPS de l’image (facultative)</label>
               <input id="product-image-url" name="imageUrl" type="text"
                      maxlength="2048" inputmode="url"
@@ -271,6 +278,14 @@
               <label for="about-link-text">Texte du lien du site</label>
               <input id="about-link-text" name="apropos_lien_texte"
                      maxlength="120" data-content-text required>
+              <label for="about-link-url">Destination du lien du site — URL HTTPS</label>
+              <input id="about-link-url" name="apropos_lien_url" type="url"
+                     maxlength="2048" inputmode="url" placeholder="https://..."
+                     data-content-text required>
+              <p class="field-help">
+                Cette adresse s’ouvrira lorsque l’on appuiera sur le texte du
+                lien dans l’application.
+              </p>
 
               <div class="content-image-field" data-content-image="photo">
                 <label for="about-photo-url">Photo — URL HTTPS (facultative)</label>
@@ -285,9 +300,8 @@
                 </div>
               </div>
               <p class="field-help">
-                La destination du lien reste le site officiel actuel. Image
-                JPEG, PNG ou WebP de 5 Mo maximum. Sans remplacement, la photo
-                actuelle est conservée.
+                Image JPEG, PNG ou WebP de 5 Mo maximum. Sans remplacement,
+                la photo actuelle est conservée.
               </p>
               <button class="button button-primary" type="submit">
                 Enregistrer les infos

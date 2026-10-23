@@ -17,7 +17,13 @@ _FIREBASE_CONFIG = None
 _REQUEST_TIMEOUT = 20
 
 _COLLECTIONS = {
-    "produits": ("nom", "prix", "description", "image"),
+    "produits": (
+        "nom",
+        "prix",
+        "description",
+        "image",
+        "telephone_commande",
+    ),
     "publications": ("titre", "contenu", "date", "image"),
 }
 

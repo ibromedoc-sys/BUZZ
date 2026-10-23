@@ -1,7 +1,8 @@
+import re
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from kivy.animation import Animation
 from kivy.clock import Clock
@@ -328,6 +329,7 @@ class VenteApp(MDApp):
         "notre site Web officiel."
     )
     apropos_lien_texte = StringProperty("SUPERLIFE-TOGO.COM")
+    apropos_lien_url = StringProperty("https://superlife-togo.com")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -429,15 +431,32 @@ class VenteApp(MDApp):
                 )
             )
 
-    def commander_whatsapp(self, produit, prix):
-        numero = "22899057931"
+    def commander_whatsapp(self, produit, prix, numero):
+        numero = re.sub(r"[^0-9]", "", str(numero))
+        if not 8 <= len(numero) <= 15:
+            self._afficher_erreur(
+                FirebaseError("Le numéro WhatsApp de ce produit n'est pas valide.")
+            )
+            return
         message = "Bonjour, je souhaite commander {} au prix de {}.".format(
             produit, prix
         )
         webbrowser.open("https://wa.me/{}?text={}".format(numero, quote(message)))
 
     def ouvrir_site(self):
-        webbrowser.open("https://superlife-togo.com")
+        destination = self.apropos_lien_url.strip()
+        parsed_destination = urlparse(destination)
+        if (
+            parsed_destination.scheme != "https"
+            or not parsed_destination.netloc
+            or parsed_destination.username
+            or parsed_destination.password
+        ):
+            self._afficher_erreur(
+                FirebaseError("La destination du site n'est pas une URL HTTPS valide.")
+            )
+            return
+        webbrowser.open(destination)
 
     def on_switch_tabs(self, bar, item, item_icon, item_text):
         self.root.ids.screen_manager.current = item.screen_name
@@ -475,7 +494,7 @@ MDLabel:
             )
         )
 
-        for _, nom, prix, description, image in produits:
+        for _, nom, prix, description, image, telephone_commande in produits:
             carte = Builder.load_string(
                 """
 MDCard:
@@ -512,7 +531,7 @@ MDCard:
         pos_hint: {{"center_x": 0.5}}
         size_hint_x: None
         width: "220dp"
-        on_release: app.commander_whatsapp("{}", "{}")
+        on_release: app.commander_whatsapp("{}", "{}", "{}")
         MDButtonIcon:
             icon: "whatsapp"
         MDButtonText:
@@ -524,6 +543,7 @@ MDCard:
                     kv_escape(description),
                     kv_escape(nom),
                     kv_escape(prix),
+                    kv_escape(telephone_commande or "22899057931"),
                 )
             )
             container.add_widget(carte)
@@ -734,6 +754,9 @@ MDCard:
         )
         self.apropos_lien_texte = about.get(
             "apropos_lien_texte", "SUPERLIFE-TOGO.COM"
+        )
+        self.apropos_lien_url = about.get(
+            "apropos_lien_url", "https://superlife-togo.com"
         )
 
         self._home_logo_paths = result["logos"]

@@ -72,7 +72,15 @@ documents au démarrage et garde son contenu local si aucun document n'a encore
 version Android contenant cette fonctionnalité ; ensuite, modifier ces champs
 ne nécessite pas une nouvelle publication Android. Le compte admin doit se
 déconnecter puis se reconnecter (ou renouveler son jeton) après modification de
-ses claims.
+ses claims. Le document `contenu/apropos` contient aussi `apropos_lien_url`,
+destination HTTPS du lien `apropos_lien_texte`; l'application l'ouvre depuis la
+page « À propos ». Sa valeur par défaut est `https://superlife-togo.com`.
+
+Chaque document de `produits` peut définir `telephone_commande`, le numéro
+WhatsApp international à utiliser pour le bouton « Commander » de ce produit.
+Le tableau de bord permet de le saisir et de le modifier produit par produit.
+Les anciens produits sans ce champ continuent d’utiliser le numéro historique
+`22899057931` jusqu’à leur modification.
 
 ## Hébergement d'images
 
@@ -108,6 +116,8 @@ facturation ni déployer `storage.rules`.
 - Modification des textes et des images de l'accueil/infos ; vérification de
   leur affichage dans l'application Android après redémarrage.
 - Création, modification et suppression de chaque type dans Firestore.
+- Modification du numéro de commande de produits différents et vérification
+  que chaque bouton « Commander » ouvre le bon numéro WhatsApp.
 - Téléversement Cloudinary d'une image JPEG, PNG ou WebP et enregistrement de
   son URL HTTPS dans Firestore.
 - Conservation de l'image existante si aucun nouveau fichier n'est sélectionné.
